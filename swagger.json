@@ -1,0 +1,145 @@
+{
+  "swagger" : "2.0",
+  "info" : {
+    "description" : "This is a simple API",
+    "version" : "1.0.0",
+    "title" : "Body dimensions API",
+    "contact" : {
+      "email" : "you@your-company.com"
+    },
+    "license" : {
+      "name" : "Apache 2.0",
+      "url" : "http://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "schemes" : [ "https" ],
+  "paths" : {
+    "/users" : {
+      "get" : {
+        "summary" : "searches users",
+        "description" : "By passing in the appropriate options, you can search for\nexisting users in the system\n",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "searchString",
+          "description" : "pass an optional search string for looking up users",
+          "required" : false,
+          "type" : "string"
+        }, {
+          "in" : "query",
+          "name" : "skip",
+          "description" : "number of records to skip for pagination",
+          "type" : "integer",
+          "format" : "int32",
+          "minimum" : 0
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "description" : "maximum number of records to return",
+          "type" : "integer",
+          "format" : "int32",
+          "minimum" : 0,
+          "maximum" : 50
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "search results matching criteria",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/User"
+              }
+            }
+          },
+          "400" : {
+            "description" : "bad input parameter"
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "admins" ],
+        "summary" : "adds an users item",
+        "operationId" : "addUser",
+        "description" : "Adds an user to the system",
+        "consumes" : [ "application/json" ],
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "User",
+          "description" : "User to add",
+          "schema" : {
+            "$ref" : "#/definitions/User"
+          }
+        } ],
+        "responses" : {
+          "201" : {
+            "description" : "item created"
+          },
+          "400" : {
+            "description" : "invalid input, object invalid"
+          },
+          "409" : {
+            "description" : "an existing item already exists"
+          }
+        }
+      }
+    }
+  },
+  "definitions" : {
+    "User" : {
+      "type" : "object",
+      "required" : [ "userid", "firstname", "lastname", "dateOfBirth", "height" ],
+      "properties" : {
+        "userid" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "firstname" : {
+          "type" : "string"
+        },
+        "lastname" : {
+          "type" : "string"
+        },
+        "dateOfBirth" : {
+          "type" : "string",
+          "format" : "date"
+        },
+        "height" : {
+          "type" : "integer",
+          "format" : "int32"
+        }
+      }
+    },
+    "UserData" : {
+      "required" : [ "userid", "weight", "measurementDate" ],
+      "properties" : {
+        "userid" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "weight" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "fatTotal" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "fatVisceral" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "bodyMass" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "measurementDate" : {
+          "type" : "string",
+          "format" : "date-time"
+        }
+      }
+    }
+  },
+  "host" : "virtserver.swaggerhub.com",
+  "basePath" : "/jorimyk/Body_dimensions/1.0.0"
+}
