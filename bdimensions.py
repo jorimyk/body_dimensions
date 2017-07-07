@@ -1,32 +1,31 @@
-from flask import Flask, request
+from flask import Flask, request, abort, jsonify
+import json
 app = Flask(__name__)
 
-users = [
-    {
-        'id': 1,
-        'name': u'Jori',
-        'genre': u'male',
-        'date_of_birth': u'7.11.1930'
-    },
-    {
-        'id': 2,
-        'name': u'Osmi',
-        'genre': u'female',
-        'date_of_birth': u'5.3.1995'
-    }
-]
+def load_json():
+    with open('users.json') as users_file:
+        users_list = json.load(users_file)
+    return(users_list)
 
-@app.route('/')
+def write_json(data):
+    with open('users_.json', 'w') as users_file:
+        json.dump(data, users_file)
+
+@app.route('/', methods = ['HEAD', 'GET'])
 def hello_world():
     return 'Welcome to root!'
 
 
 @app.route('/users', methods = ['POST', 'GET', 'PUT', 'DELETE'])
 def users():
-    if request.method == 'POST':
-        return 'Add a new user'
-    elif request.method == 'GET':
-        return 'List users'
+    if request.method == 'POST': # Add a new user
+        if request.headers['Content-Type'] == 'application/json':
+            return "JSON Message: " + json.dumps(request.json)
+        else:
+            abort(415)
+    elif request.method == 'GET': # List all users
+        users_list = load_json()
+        return jsonify(users_list)
     elif request.method == 'PUT':
         return 'Bulk update users'
     elif request.method == 'DELETE':
@@ -35,9 +34,12 @@ def users():
 
 @app.route('/users/<int:user_id>', methods = ['GET', 'PUT', 'DELETE'])
 def user(user_id):
-#    user = [user for user in users if user['id'] == user_id]
-    if request.method == 'GET':
-        return 'Show user with id %s' % user_id
+    if request.method == 'GET': # Show user with user_id
+        users_list = load_json()
+        user = [user for user in users_list if user['user_id'] == user_id]
+        if len(user) == 0:
+            abort(404)
+        return jsonify({'user': user[0]})
     elif request.method == 'PUT':
         return 'If exists update user with id %s' % user_id
     elif request.method == 'DELETE':
