@@ -41,7 +41,9 @@ class UserData(Base):
     def serialize(self):
        return {
             'id': self.id,
+            'userId': self.userId,
             'measurementDate': self.measurementDate,
+            'height' : self.height,
             'weight' : self.weight,
             'fatTotal' : self.fatTotal,
             'bodyMass' : self.bodyMass,
