@@ -84,7 +84,7 @@ def data(userId, dataId):
         else:
             abort(415, 'Content Type must be application/json')
     elif request.method == 'DELETE': # Delete a measurement data item
-        return 'Delete data item with id %s for user with id %s' % (dataId, userId)
+        return deleteDataItem(userId, dataId)
 
 
 def addNewUser(d):
@@ -103,6 +103,7 @@ def addNewUser(d):
     else:
         abort(400, 'Request must contain keywords firstName, lastName, genre and dateOfBirth with values')
 
+
 def getAllUsers():
     users = session.query(Users).all()
     if users:
@@ -110,12 +111,14 @@ def getAllUsers():
     else:
         abort(404, 'No users found')
 
+
 def getUser(userId):
     user = session.query(Users).filter_by(id = userId).first()
     if user:
         return jsonify(Users=user.serialize)
     else:
         abort(404, 'User with id %s does not exist' % userId)
+
 
 def updateUser(userId, d):
     user = session.query(Users).filter_by(id = userId).first()
@@ -254,6 +257,20 @@ def updateDataItem(userId, dataId, d):
                 session.add(user)
                 session.commit()
                 return jsonify(UserData=data.serialize)
+        else:
+            abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
+    else:
+        abort(404, 'User with id %s does not exist' % userId)
+
+
+def deleteDataItem(userId, dataId):
+    user = session.query(Users).filter_by(id = userId).first()
+    if user:
+        data = session.query(UserData).filter_by(userId = userId).filter_by(id = dataId).first()
+        if data:
+            session.delete(data)
+            session.commit()
+            return 'Removed data with id %s from user with id %s' % (dataId, userId)
         else:
             abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
     else:
