@@ -99,7 +99,7 @@ def addNewUser(d):
         dateOfBirth = d.get('dateOfBirth'))
         session.add(user)
         session.commit()
-        return jsonify(Users=user.serialize)
+        return jsonify(user.serialize)
     else:
         abort(400, 'Request must contain keywords firstName, lastName, genre and dateOfBirth with values')
 
@@ -107,7 +107,7 @@ def addNewUser(d):
 def getAllUsers():
     users = session.query(Users).all()
     if users:
-        return jsonify(Users=[i.serialize for i in users])
+        return jsonify([i.serialize for i in users])
     else:
         abort(404, 'No users found')
 
@@ -115,7 +115,7 @@ def getAllUsers():
 def getUser(userId):
     user = session.query(Users).filter_by(id = userId).first()
     if user:
-        return jsonify(Users=user.serialize)
+        return jsonify(user.serialize)
     else:
         abort(404, 'User with id %s does not exist' % userId)
 
@@ -139,7 +139,7 @@ def updateUser(userId, d):
         if validData:
             session.add(user)
             session.commit()
-            return jsonify(Users=user.serialize)
+            return jsonify(user.serialize)
         else:
             abort(400, 'Request must contain firstName, lastName, genre or dateOfBirth keyword with values')
     else:
@@ -177,7 +177,7 @@ def addNewData(userId, d):
             fatVisceral = d.get('fatVisceral'))
             session.add(data)
             session.commit()
-            return jsonify(UserData=data.serialize)
+            return jsonify(data.serialize)
     else:
         abort(404, 'User with id %s does not exist' % userId)
 
@@ -187,7 +187,7 @@ def getUserData(userId):
     if user:
         data = session.query(UserData).filter_by(userId = userId).all()
         if data:
-            return jsonify(UserData=[i.serialize for i in data])
+            return jsonify([i.serialize for i in data])
         else:
             abort(404, 'No data for user with id %s' % userId)
     else:
@@ -214,7 +214,7 @@ def getDataItem(userId, dataId):
     if user:
         data = session.query(UserData).filter_by(userId = userId).filter_by(id = dataId).first()
         if data:
-            return jsonify(UserData=data.serialize)
+            return jsonify(data.serialize)
         else:
             abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
     else:
@@ -256,7 +256,7 @@ def updateDataItem(userId, dataId, d):
             else:
                 session.add(user)
                 session.commit()
-                return jsonify(UserData=data.serialize)
+                return jsonify(data.serialize)
         else:
             abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
     else:
