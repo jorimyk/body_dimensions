@@ -8,15 +8,18 @@ class Users(Base):
     __tablename__ = 'user'
 
     id = Column(Integer, primary_key = True)
-    firstName = Column(String(80), nullable = False)
-    lastName = Column(String(80), nullable = False)
-    genre = Column(String(6), nullable = False)
-    dateOfBirth = Column(String(10), nullable = False)
+    firstName = Column(String(80), nullable = True)
+    lastName = Column(String(80), nullable = True)
+    genre = Column(String(6), nullable = True)
+    dateOfBirth = Column(String(10), nullable = True)
+    username = Column(String(20), nullable = False)
+    password = Column(String(80), nullable = False)
     
     @property
     def serialize(self):
        return {
             'id': self.id,
+            'username': self.username,
             'firstName': self.firstName,
             'lastName' : self.lastName,
             'genre' : self.genre,
@@ -24,7 +27,7 @@ class Users(Base):
        }
 
 class UserData(Base):
-    __tablename__ = 'user_data'
+    __tablename__ = 'measurement'
 
     id = Column(Integer, primary_key = True)
     userId = Column(Integer, nullable = False)
@@ -40,8 +43,6 @@ class UserData(Base):
     @property
     def serialize(self):
        return {
-            'id': self.id,
-            'userId': self.userId,
             'measurementDate': self.measurementDate,
             'height' : self.height,
             'weight' : self.weight,
