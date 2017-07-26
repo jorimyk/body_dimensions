@@ -1,7 +1,7 @@
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, abort, jsonify, make_response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, Users, UserData
+from models import Base, Users, Measurements
 from passlib.hash import argon2
 import json
 
@@ -26,7 +26,7 @@ def users():
                 d = request.get_json()
                 if checkUsername(d.get('username')): return addNewUser(d)
             else:
-                abort (400, 'No json in request content')
+                abort (400, 'No valid json in request content')
         else:
             abort(400, 'Content Type must be application/json')
     elif request.method == 'GET': # List all users
@@ -52,11 +52,11 @@ def user(userId):
                     d = request.get_json()
                     return updateUser(userId, d)
                 else:
-                    abort (400, 'No json in request content')
+                    abort (400, 'No valid json in request content')
             else:
                 abort(400, 'Content Type must be application/json')
         elif request.method == 'DELETE': # Delete user and all data for user
-            if checkIfData(userId): deleteAllUserData(userId)
+            if checkIfMeasurements(userId): deleteAllMeasurements(userId)
             return deleteUser(userId)
     else:
         abort (401, 'Wrong username / password')
@@ -73,15 +73,15 @@ def measurement(userId):
             if request.headers['Content-Type'] == 'application/json':
                 if request.get_json(silent=True):
                     d = request.get_json()
-                    return addNewData(userId, d)
+                    return addNewMeasurement(userId, d)
                 else:
-                    abort (400, 'No json in request content')
+                    abort (400, 'No valid json in request content')
             else:
                 abort(400, 'Content Type must be application/json')
         elif request.method == 'GET': # Get all measurement data for user
-            return getUserData(userId)
+            return getMeasurements(userId)
         elif request.method == 'DELETE': # Delete all measurement data for user
-            return deleteAllUserData(userId)
+            return deleteAllMeasurements(userId)
     else:
         abort (401, 'Wrong username / password')
 
@@ -94,18 +94,18 @@ def data(userId, dataId):
         abort (401, 'Authorization required')
     if authenticate(userId, auth):
         if request.method == 'GET': # Get a measurement data item
-            return getDataItem(userId, dataId)
+            return getMeasurementItem(userId, dataId)
         elif request.method == 'PUT': # Update a measurement data item
             if request.headers['Content-Type'] == 'application/json':
                 if request.get_json(silent=True):
                     d = request.get_json()
-                    return updateDataItem(userId, dataId, d)
+                    return updateMeasurementItem(userId, dataId, d)
                 else:
-                    abort (400, 'No json in request content')
+                    abort (400, 'No valid json in request content')
             else:
                 abort(400, 'Content Type must be application/json')
         elif request.method == 'DELETE': # Delete a measurement data item
-            return deleteDataItem(userId, dataId)
+            return deleteMeasurementItem(userId, dataId)
     else:
         abort (401, 'Wrong username / password')
 
@@ -121,9 +121,9 @@ def addNewUser(d):
         password = createPassword(d.get('password')))
         session.add(user)
         session.commit()
-        return jsonify(user.serialize)
+        return jsonify(user.serialize), 201
     else:
-        abort(400, 'Request must contain username and password')
+        abort(make_response(jsonify(firstName='Optional', lastName='Optional', genre='Optional', dateOfBirth='Optional', username='Mandatory', password='Mandatory'), 400))
 
 
 def getAllUsers():
@@ -141,43 +141,49 @@ def getUser(userId):
 
 def updateUser(userId, d):
     user = session.query(Users).filter_by(id = userId).first()
-    validData = False
+    validRequest = False
     if 'firstName' in d and d.get('firstName'):
-        validData = True
+        validRequest = True
         user.firstName = d.get('firstName')
     if 'lastName' in d and d.get('lastName'):
-        validData = True
+        validRequest = True
         user.lastName = d.get('lastName')
     if 'genre' in d and d.get('genre'):
-        validData = True
+        validRequest = True
         user.genre = d.get('genre')
     if 'dateOfBirth' in d and d.get('dateOfBirth'):
-        validData = True
+        validRequest = True
         user.dateOfBirth = d.get('dateOfBirth')
-    if validData:
+    if 'username' in d and d.get('username'):
+        validRequest = True
+        user.username = d.get('username')
+    if 'password' in d and d.get('password'):
+        validRequest = True
+        user.password = createPassword(d.get('password'))
+    if validRequest:
         session.add(user)
         session.commit()
-        return jsonify(user.serialize)
+        return jsonify(user.serialize), 201
     else:
-        abort(400, 'Request must contain firstName, lastName, genre or dateOfBirth keyword with values')
+        abort(make_response(jsonify(firstName=d.get('firstName'), lastName=d.get('lastName'), genre=d.get('genre'), dateOfBirth=d.get('dateOfBirth'), username=d.get('username'), password=d.get('password')), 400))
 
 
 def deleteUser(userId):
     user = session.query(Users).filter_by(id = userId).first()
     session.delete(user)
     session.commit()
-    return 'Removed user with id %s' % userId
+    return 'User %s (id %s) removed' % (user.username, userId)
 
 
-def addNewData(userId, d):
+def addNewMeasurement(userId, d):
     if not 'measurementDate' in d or not d.get('measurementDate'):
-        abort(400, 'Request must contain keyword measurementDate with valid date')
-    elif not d.get('height') and not d.get('weight') and not d.get('waistline'):
-        abort(400, 'Request must contain value for height, weight or waistline keyword')
+        abort(make_response(jsonify(measurementDate='Mandatory', height='Optional', weight='Optional', waistline='Optional', fatTotal='Optional', bodyMass='Optional', fatVisceral='Optional'), 400))
+    #elif not d.get('height') and not d.get('weight') and not d.get('waistline'):
+        #abort(400, 'Request must contain value for height, weight or waistline keyword')
     elif (d.get('fatTotal') or d.get('bodyMass') or d.get('fatVisceral')) and not d.get('weight'):
-        abort(400, 'For fatTotal, bodyMass and fatVisceral request must contain weight')
+        abort(make_response(jsonify(measurementDate=d.get('measurementDate'), weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
     else:        
-        data = UserData( \
+        data = Measurements( \
         userId = userId, \
         measurementDate = d.get('measurementDate'), \
         height = d.get('height'), \
@@ -188,84 +194,81 @@ def addNewData(userId, d):
         fatVisceral = d.get('fatVisceral'))
         session.add(data)
         session.commit()
-        return jsonify(data.serialize)
+        return jsonify(data.serialize), 201
 
 
-def getUserData(userId):
-    data = session.query(UserData).filter_by(userId = userId).all()
+def getMeasurements(userId):
+    data = session.query(Measurements).filter_by(userId = userId).all()
     if data:
         return jsonify([i.serialize for i in data])
     else:
-        abort(404, 'No data for user with id %s' % userId)
+        abort(404, 'No measurements for user %s (id %s)' % (getUsername(userId), userId))
 
 
-def deleteAllUserData(userId):
-    data = session.query(UserData).filter_by(userId = userId).all()
+def deleteAllMeasurements(userId):
+    data = session.query(Measurements).filter_by(userId = userId).all()
     if data:
         for index in range(len(data)):
             session.delete(data[index])
             session.commit()
-        return 'All %s data items removed for user with id %s' % (len(data), userId)
+        return 'All %s measurement items removed for user %s (id %s)' % (len(data), getUsername(userId), userId)
     else:
-        abort(404, 'No data for user with id %s' % userId)            
+        abort(404, 'No measurements for user %s (id %s)' % (getUsername(userId), userId))
 
 
-def getDataItem(userId, dataId):
-    data = session.query(UserData).filter_by(userId = userId).filter_by(id = dataId).first()
+def getMeasurementItem(userId, dataId):
+    data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
         return jsonify(data.serialize)
     else:
-        abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
+        abort(404, 'User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId))
 
 
-def updateDataItem(userId, dataId, d):
-    data = session.query(UserData).filter_by(userId = userId).filter_by(id = dataId).first()
+def updateMeasurementItem(userId, dataId, d):
+    data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
-        validData = False
+        validRequest = False
         if 'measurementDate' in d and d.get('measurementDate'):
-            validData = True
+            validRequest = True
             data.measurementDate = d.get('measurementDate')
         if 'height' in d and d.get('height'):
-            validData = True
+            validRequest = True
             data.height = d.get('height')
         if 'weight' in d and d.get('weight'):
-            validData = True
+            validRequest = True
             data.weight = d.get('weight')
         if 'waistline' in d and d.get('waistline'):
-            validData = True
+            validRequest = True
             data.waistline = d.get('waistline')
         if 'fatTotal' in d and d.get('fatTotal'):
-            validData = True
+            validRequest = True
             data.fatTotal = d.get('fatTotal')
         if 'fatVisceral' in d and d.get('fatVisceral'):
-            validData = True
+            validRequest = True
             data.fatVisceral = d.get('fatVisceral')
         if 'bodyMass' in d and d.get('bodyMass'):
-            validData = True
+            validRequest = True
             data.bodyMass = d.get('bodyMass')
-        if not validData:
-            abort(400, 'Request must contain valid keyword(s) with value(s)')
-        elif (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) \
-        and not data.weight and not d.get('weight'):
-            abort(400, 'Weight needs to be defined for fatTotal, fatVisceral and bodyMass')
+        if not validRequest:
+            abort(make_response(jsonify(measurementDate=d.get('measurementDate'), height=d.get('height'), weight=d.get('weight'), waistline=d.get('waistline'), fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
+        elif (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) and not data.weight and not d.get('weight'):
+            abort(make_response(jsonify(weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
         else:
             session.add(data)
             session.commit()
-            return jsonify(data.serialize)
+            return jsonify(data.serialize), 201
     else:
-        abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
+        abort(404, 'User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId))
 
 
-def deleteDataItem(userId, dataId):
-    user = session.query(Users).filter_by(id = userId).first()
-    #if user:
-    data = session.query(UserData).filter_by(userId = userId).filter_by(id = dataId).first()
+def deleteMeasurementItem(userId, dataId):
+    data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
         session.delete(data)
         session.commit()
-        return 'Removed data with id %s from user with id %s' % (dataId, userId)
+        return 'Removed measurements with id %s from user %s (id %s)' % (dataId, getUsername(userId), userId)
     else:
-        abort(404, 'User with id %s does not have data with id %s' % (userId, dataId))
+        abort(404, 'User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId))
 
 
 def checkUsername(username):
@@ -276,8 +279,8 @@ def checkUsername(username):
         return True
 
 def createPassword(password):
-    hashedPwd = argon2.hash(password)
-    return(hashedPwd)
+    passwordHash = argon2.hash(password)
+    return(passwordHash)
 
 def authenticate(userId, auth):
     q = session.query(Users).add_columns('username', 'password').filter_by(id = userId).first()
@@ -286,11 +289,16 @@ def authenticate(userId, auth):
     else:
         abort(404, 'User with id %s does not exist' % userId)
 
-def checkIfData(userId):
-    q = session.query(UserData).filter_by(userId = userId).first()
+def checkIfMeasurements(userId):
+    q = session.query(Measurements).filter_by(userId = userId).first()
     return q
-    
 
+def getUsername(userId):
+    q = session.query(Users).add_columns('username').filter_by(id = userId).first()
+    if q:
+        return q[1]
+    else:
+        abort(404, 'User with id %s does not exist' % userId)
 
 if __name__ == '__main__':
     app.debug = True

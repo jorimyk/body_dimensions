@@ -26,7 +26,7 @@ class Users(Base):
             'dateOfBirth' : self.dateOfBirth
        }
 
-class UserData(Base):
+class Measurements(Base):
     __tablename__ = 'measurement'
 
     id = Column(Integer, primary_key = True)
@@ -43,6 +43,7 @@ class UserData(Base):
     @property
     def serialize(self):
        return {
+            'id': self.id,
             'measurementDate': self.measurementDate,
             'height' : self.height,
             'weight' : self.weight,
