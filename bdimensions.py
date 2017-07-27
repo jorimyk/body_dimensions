@@ -1,17 +1,23 @@
 from flask import Flask, request, abort, jsonify, make_response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base, Users, Measurements
 from passlib.hash import argon2
-import json
+import json, datetime
 
-engine = create_engine('sqlite:///bdimension.db')
+engine = create_engine('mysql://bdimensions:fatty@localhost/bdimensions')
+#engine = create_engine('sqlite:///bdimension.db')
 Base.metadata.bind = engine
 
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
 app = Flask(__name__)
+
+limiter = Limiter(app, key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"])
 
 @app.route('/', methods = ['HEAD', 'GET']) # /
 def hello_world():
@@ -22,11 +28,8 @@ def hello_world():
 def users():
     if request.method == 'POST': # Add a new user
         if request.headers['Content-Type'] == 'application/json':
-            if request.get_json(silent=True):
-                d = request.get_json()
-                if checkUsername(d.get('username')): return addNewUser(d)
-            else:
-                abort (400, 'No valid json in request content')
+            d = request.get_json(silent=True)
+            return addNewUser(d)
         else:
             abort(400, 'Content Type must be application/json')
     elif request.method == 'GET': # List all users
@@ -48,14 +51,11 @@ def user(userId):
             return getUser(userId)
         elif request.method == 'PUT': # Update user
             if request.headers['Content-Type'] == 'application/json':
-                if request.get_json(silent=True):
-                    d = request.get_json()
-                    return updateUser(userId, d)
-                else:
-                    abort (400, 'No valid json in request content')
+                d = request.get_json(silent=True)
+                return updateUser(userId, d)
             else:
                 abort(400, 'Content Type must be application/json')
-        elif request.method == 'DELETE': # Delete user and all data for user
+        elif request.method == 'DELETE': # Delete user and all measurements for user
             if checkIfMeasurements(userId): deleteAllMeasurements(userId)
             return deleteUser(userId)
     else:
@@ -71,11 +71,8 @@ def measurement(userId):
     if authenticate(userId, auth):
         if request.method == 'POST': # Add new measurement data
             if request.headers['Content-Type'] == 'application/json':
-                if request.get_json(silent=True):
-                    d = request.get_json()
-                    return addNewMeasurement(userId, d)
-                else:
-                    abort (400, 'No valid json in request content')
+                d = request.get_json(silent=True)
+                return addNewMeasurement(userId, d)
             else:
                 abort(400, 'Content Type must be application/json')
         elif request.method == 'GET': # Get all measurement data for user
@@ -97,11 +94,8 @@ def data(userId, dataId):
             return getMeasurementItem(userId, dataId)
         elif request.method == 'PUT': # Update a measurement data item
             if request.headers['Content-Type'] == 'application/json':
-                if request.get_json(silent=True):
-                    d = request.get_json()
-                    return updateMeasurementItem(userId, dataId, d)
-                else:
-                    abort (400, 'No valid json in request content')
+                d = request.get_json(silent=True)
+                return updateMeasurementItem(userId, dataId, d)
             else:
                 abort(400, 'Content Type must be application/json')
         elif request.method == 'DELETE': # Delete a measurement data item
@@ -111,17 +105,18 @@ def data(userId, dataId):
 
 
 def addNewUser(d):
-    if 'username' in d and d.get('username') and 'password' in d and d.get('password'):
-        user = Users( \
-        firstName = d.get('firstName'), \
-        lastName = d.get('lastName'), \
-        genre = d.get('genre'), \
-        dateOfBirth = d.get('dateOfBirth'), \
-        username = d.get('username'), \
-        password = createPassword(d.get('password')))
-        session.add(user)
-        session.commit()
-        return jsonify(user.serialize), 201
+    if d and checkUsername(d.get('username')):
+        if 'username' in d and d.get('username') and 'password' in d and d.get('password'):
+            user = Users( \
+            firstName = d.get('firstName'), \
+            lastName = d.get('lastName'), \
+            genre = d.get('genre'), \
+            dateOfBirth = d.get('dateOfBirth'), \
+            username = d.get('username'), \
+            password = createPassword(d.get('password')))
+            session.add(user)
+            session.commit()
+            return jsonify(user.serialize), 201
     else:
         abort(make_response(jsonify(firstName='Optional', lastName='Optional', genre='Optional', dateOfBirth='Optional', username='Mandatory', password='Mandatory'), 400))
 
@@ -140,32 +135,35 @@ def getUser(userId):
 
 
 def updateUser(userId, d):
-    user = session.query(Users).filter_by(id = userId).first()
-    validRequest = False
-    if 'firstName' in d and d.get('firstName'):
-        validRequest = True
-        user.firstName = d.get('firstName')
-    if 'lastName' in d and d.get('lastName'):
-        validRequest = True
-        user.lastName = d.get('lastName')
-    if 'genre' in d and d.get('genre'):
-        validRequest = True
-        user.genre = d.get('genre')
-    if 'dateOfBirth' in d and d.get('dateOfBirth'):
-        validRequest = True
-        user.dateOfBirth = d.get('dateOfBirth')
-    if 'username' in d and d.get('username'):
-        validRequest = True
-        user.username = d.get('username')
-    if 'password' in d and d.get('password'):
-        validRequest = True
-        user.password = createPassword(d.get('password'))
-    if validRequest:
-        session.add(user)
-        session.commit()
-        return jsonify(user.serialize), 201
+    if d:
+        user = session.query(Users).filter_by(id = userId).first()
+        validRequest = False
+        if 'firstName' in d and d.get('firstName'):
+            validRequest = True
+            user.firstName = d.get('firstName')
+        if 'lastName' in d and d.get('lastName'):
+            validRequest = True
+            user.lastName = d.get('lastName')
+        if 'genre' in d and d.get('genre'):
+            validRequest = True
+            user.genre = d.get('genre')
+        if 'dateOfBirth' in d and d.get('dateOfBirth'):
+            validRequest = True
+            user.dateOfBirth = d.get('dateOfBirth')
+        if 'username' in d and d.get('username') and checkUsername(d.get('username')):
+            validRequest = True
+            user.username = d.get('username')
+        if 'password' in d and d.get('password'):
+            validRequest = True
+            user.password = createPassword(d.get('password'))
+        if validRequest:
+            session.add(user)
+            session.commit()
+            return jsonify(user.serialize), 201
+        else:
+            abort(make_response(jsonify(firstName=d.get('firstName'), lastName=d.get('lastName'), genre=d.get('genre'), dateOfBirth=d.get('dateOfBirth'), username=d.get('username'), password=d.get('password')), 400))
     else:
-        abort(make_response(jsonify(firstName=d.get('firstName'), lastName=d.get('lastName'), genre=d.get('genre'), dateOfBirth=d.get('dateOfBirth'), username=d.get('username'), password=d.get('password')), 400))
+        abort(make_response(jsonify(firstName='Optional', lastName='Optional', genre='Optional', dateOfBirth='Optional', username='Optional', password='Optional'), 400))
 
 
 def deleteUser(userId):
@@ -176,13 +174,13 @@ def deleteUser(userId):
 
 
 def addNewMeasurement(userId, d):
-    if not 'measurementDate' in d or not d.get('measurementDate'):
+    if not d or not 'measurementDate' in d or not d.get('measurementDate'):
         abort(make_response(jsonify(measurementDate='Mandatory', height='Optional', weight='Optional', waistline='Optional', fatTotal='Optional', bodyMass='Optional', fatVisceral='Optional'), 400))
     #elif not d.get('height') and not d.get('weight') and not d.get('waistline'):
         #abort(400, 'Request must contain value for height, weight or waistline keyword')
     elif (d.get('fatTotal') or d.get('bodyMass') or d.get('fatVisceral')) and not d.get('weight'):
         abort(make_response(jsonify(measurementDate=d.get('measurementDate'), weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
-    else:        
+    elif checkMeasurementDate(userId, d.get('measurementDate')):        
         data = Measurements( \
         userId = userId, \
         measurementDate = d.get('measurementDate'), \
@@ -227,36 +225,39 @@ def getMeasurementItem(userId, dataId):
 def updateMeasurementItem(userId, dataId, d):
     data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
-        validRequest = False
-        if 'measurementDate' in d and d.get('measurementDate'):
-            validRequest = True
-            data.measurementDate = d.get('measurementDate')
-        if 'height' in d and d.get('height'):
-            validRequest = True
-            data.height = d.get('height')
-        if 'weight' in d and d.get('weight'):
-            validRequest = True
-            data.weight = d.get('weight')
-        if 'waistline' in d and d.get('waistline'):
-            validRequest = True
-            data.waistline = d.get('waistline')
-        if 'fatTotal' in d and d.get('fatTotal'):
-            validRequest = True
-            data.fatTotal = d.get('fatTotal')
-        if 'fatVisceral' in d and d.get('fatVisceral'):
-            validRequest = True
-            data.fatVisceral = d.get('fatVisceral')
-        if 'bodyMass' in d and d.get('bodyMass'):
-            validRequest = True
-            data.bodyMass = d.get('bodyMass')
-        if not validRequest:
-            abort(make_response(jsonify(measurementDate=d.get('measurementDate'), height=d.get('height'), weight=d.get('weight'), waistline=d.get('waistline'), fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
-        elif (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) and not data.weight and not d.get('weight'):
-            abort(make_response(jsonify(weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
+        if d:
+            validRequest = False
+            if 'measurementDate' in d and d.get('measurementDate') and checkMeasurementDate(userId, d.get('measurementDate')):
+                validRequest = True
+                data.measurementDate = d.get('measurementDate')
+            if 'height' in d and d.get('height'):
+                validRequest = True
+                data.height = d.get('height')
+            if 'weight' in d and d.get('weight'):
+                validRequest = True
+                data.weight = d.get('weight')
+            if 'waistline' in d and d.get('waistline'):
+                validRequest = True
+                data.waistline = d.get('waistline')
+            if 'fatTotal' in d and d.get('fatTotal'):
+                validRequest = True
+                data.fatTotal = d.get('fatTotal')
+            if 'fatVisceral' in d and d.get('fatVisceral'):
+                validRequest = True
+                data.fatVisceral = d.get('fatVisceral')
+            if 'bodyMass' in d and d.get('bodyMass'):
+                validRequest = True
+                data.bodyMass = d.get('bodyMass')
+            if not validRequest:
+                abort(make_response(jsonify(measurementDate=d.get('measurementDate'), height=d.get('height'), weight=d.get('weight'), waistline=d.get('waistline'), fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
+            elif (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) and not data.weight and not d.get('weight'):
+                abort(make_response(jsonify(weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
+            else:
+                session.add(data)
+                session.commit()
+                return jsonify(data.serialize), 201
         else:
-            session.add(data)
-            session.commit()
-            return jsonify(data.serialize), 201
+            abort(make_response(jsonify(measurementDate='Optional', height='Optional', weight='Optional', waistline='Optional', fatTotal='Optional', bodyMass='Optional', fatVisceral='Optional'), 400))
     else:
         abort(404, 'User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId))
 
@@ -271,13 +272,6 @@ def deleteMeasurementItem(userId, dataId):
         abort(404, 'User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId))
 
 
-def checkUsername(username):
-    q = session.query(Users).filter_by(username = username).first()
-    if q:
-        abort(400, 'Username %s is in use' % username)
-    else:
-        return True
-
 def createPassword(password):
     passwordHash = argon2.hash(password)
     return(passwordHash)
@@ -289,9 +283,13 @@ def authenticate(userId, auth):
     else:
         abort(404, 'User with id %s does not exist' % userId)
 
-def checkIfMeasurements(userId):
-    q = session.query(Measurements).filter_by(userId = userId).first()
-    return q
+
+def checkUsername(username):
+    q = session.query(Users).filter_by(username = username).first()
+    if q:
+        abort(400, 'Username %s is in use' % username)
+    else:
+        return True
 
 def getUsername(userId):
     q = session.query(Users).add_columns('username').filter_by(id = userId).first()
@@ -299,6 +297,18 @@ def getUsername(userId):
         return q[1]
     else:
         abort(404, 'User with id %s does not exist' % userId)
+
+def checkIfMeasurements(userId):
+    q = session.query(Measurements).filter_by(userId = userId).first()
+    return q
+
+def checkMeasurementDate(userId, measurementDate):
+    q = session.query(Measurements).add_columns('id').filter_by(userId = userId).filter_by(measurementDate = measurementDate).first()
+    if q:
+        abort(400, 'User %s already has an measurement item id %s for date %s' % (getUsername(userId), q[1], measurementDate))
+    else:
+        return True
+
 
 if __name__ == '__main__':
     app.debug = True

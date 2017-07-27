@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date
+from sqlalchemy import Column, Float, Integer, String, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 
@@ -11,7 +11,7 @@ class Users(Base):
     firstName = Column(String(80), nullable = True)
     lastName = Column(String(80), nullable = True)
     genre = Column(String(6), nullable = True)
-    dateOfBirth = Column(String(10), nullable = True)
+    dateOfBirth = Column(Date, nullable = True)
     username = Column(String(20), nullable = False)
     password = Column(String(80), nullable = False)
     
@@ -31,14 +31,13 @@ class Measurements(Base):
 
     id = Column(Integer, primary_key = True)
     userId = Column(Integer, nullable = False)
-    measurementDate = Column(String(10), nullable = False)
-    height = Column(Integer, nullable = True)
-    weight = Column(Integer, nullable = True)
-    fatTotal = Column(Integer, nullable = True)
-    bodyMass = Column(Integer, nullable = True)
+    measurementDate = Column(Date, nullable = False)
+    height = Column(Float, nullable = True)
+    weight = Column(Float, nullable = True)
+    fatTotal = Column(Float, nullable = True)
+    bodyMass = Column(Float, nullable = True)
     fatVisceral = Column(Integer, nullable = True)
-    bodyMass = Column(Integer, nullable = True)
-    waistline = Column(Integer, nullable = True)
+    waistline = Column(Float, nullable = True)
     
     @property
     def serialize(self):
@@ -54,6 +53,6 @@ class Measurements(Base):
        }
  
 
-
-engine = create_engine('sqlite:///bdimension.db')
+engine = create_engine('mysql://bdimensions:fatty@localhost/bdimensions')
+#engine = create_engine('sqlite:///bdimension.db')
 Base.metadata.create_all(engine)
