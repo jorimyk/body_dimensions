@@ -1,4 +1,4 @@
-from flask import Flask, request, abort, jsonify, make_response, render_template
+from flask import Flask, request, abort, jsonify, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sqlalchemy import create_engine
@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from models import Base, Users, Measurements
 from passlib.hash import argon2
 from itsdangerous import(TimedJSONWebSignatureSerializer as Serializer, BadSignature, SignatureExpired)
-import json, random, string
+import json, random, string, datetime
 
 engine = create_engine('mysql://bdimensions:fatty@localhost/bdimensions')
 #engine = create_engine('sqlite:///bdimension.db')
@@ -23,20 +23,16 @@ limiter = Limiter(app, key_func=get_remote_address,
 secret_key = secret_key = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(32))
 
 
-@app.route('/login', methods = ['POST']) # /login page
-def login():
-    if request.method == 'POST':
-        if request.authorization:
-            auth = request.authorization
-        else:
-            abort(make_response(jsonify(error='Username/password required'), 401))
-        userId = checkUserId(auth.get('username'))
-        if not userId:
-            abort(make_response(jsonify(error='User %s not found' % auth.get('username')), 401))
-        elif not verifyPassword(userId, auth):
-            abort(make_response(jsonify(error='Invalid password'), 401))
-        else:
-            return jsonify({'token': generateAuthToken(userId, 1800).decode('ascii')})
+@app.route('/login')
+def index():
+    if request.authorization:
+        auth = request.authorization
+    else:
+        abort(make_response(jsonify(error='Authorization required'), 401))
+    if verifyPassword(auth.get('username'), auth.get('password')):
+        return jsonify({'token': generateToken(checkUserId(auth.get('username')), auth.get('username'), 600).decode('ascii')})
+    else:
+        abort(make_response(jsonify(error='Invalid username/password'), 401))
 
 
 @app.route('/users', methods = ['POST', 'GET', 'PUT', 'DELETE']) # /users
@@ -120,7 +116,11 @@ def data(userId, dataId):
 
 
 def addNewUser(d):
-    if d and 'username' in d and d.get('username') and checkUsername(d.get('username')) and 'password' in d and d.get('password'):
+    if d and 'username' in d and checkUsername(d.get('username')) and 'password' in d and d.get('password'):
+        if 'firstName' in d: validateString('firstName', d.get('firstName'), 80)
+        if 'lastName' in d: validateString('lastName', d.get('lastName'), 80)
+        if 'genre' in d: validateGenre(d.get('genre'))
+        if 'dateOfBirth' in d: validateDate(None, d.get('dateOfBirth'))
         user = Users( \
         firstName = d.get('firstName'), \
         lastName = d.get('lastName'), \
@@ -133,7 +133,7 @@ def addNewUser(d):
         return jsonify(user.serialize), 201
     else:
         error = {'error': 'Incomplete request'}
-        example = {'firstName': 'Optional', 'lastName': 'Optional', 'genre': 'Optional', 'dateOfBirth': 'Optional', 'username': 'Mandatory', 'password': 'Mandatory'}
+        example = {'firstName': 'string/null', 'lastName': 'string/null', 'genre': 'male/female/null', 'dateOfBirth': 'YYYY-MM-DD/null', 'username': 'string', 'password': 'string'}
         abort(make_response(jsonify(error, example), 400))
 
 
@@ -154,16 +154,16 @@ def updateUser(userId, d):
     if d:
         user = session.query(Users).filter_by(id = userId).first()
         validRequest = False
-        if 'firstName' in d and d.get('firstName'):
+        if 'firstName' in d and validateString('firstName', d.get('firstName'), 80):
             validRequest = True
             user.firstName = d.get('firstName')
-        if 'lastName' in d and d.get('lastName'):
+        if 'lastName' in d and validateString('lastName', d.get('lastName'), 80):
             validRequest = True
             user.lastName = d.get('lastName')
-        if 'genre' in d and d.get('genre'):
+        if 'genre' in d and validateGenre(d.get('genre')):
             validRequest = True
             user.genre = d.get('genre')
-        if 'dateOfBirth' in d and d.get('dateOfBirth'):
+        if 'dateOfBirth' in d and validateDate(None, d.get('dateOfBirth')):
             validRequest = True
             user.dateOfBirth = d.get('dateOfBirth')
         if 'username' in d and checkUsername(d.get('username')):
@@ -182,7 +182,7 @@ def updateUser(userId, d):
             abort(make_response(jsonify(error, example), 400))
     else:
         error = {'error': 'No valid JSON in request'}
-        example = {'firstName': 'Optional', 'lastName': 'Optional', 'genre': 'Optional', 'dateOfBirth': 'Optional', 'username': 'Optional', 'password': 'Optional'}
+        example = {'firstName': 'string/null', 'lastName': 'string/null', 'genre': '(male/female/null)', 'dateOfBirth': 'YYYY-MM-DD/null', 'username': 'string', 'password': 'string'}
         abort(make_response(jsonify(error, example), 400))
 
 
@@ -195,13 +195,17 @@ def deleteUser(userId):
 
 def addNewMeasurement(userId, d):
     if d:
-        checkMeasurementDate(userId, d.get('measurementDate'))
+        validateDate(userId, d.get('measurementDate'))
     else:
-        error = {'error': 'Incomple request'}
-        example = {'measurementDate': 'Mandatory', 'height': 'Optional', 'weight': 'Optional', 'waistline': 'Optional', 'fatTotal': 'Optional', 'bodyMass': 'Optional', 'fatVisceral': 'Optional'}
+        error = {'error': 'No valid JSON in request'}
+        example = {'measurementDate': 'Mandatory, YYYY-MM-DD', 'height': 'number/null', 'weight': 'number/null', 'waistline': 'number/null', 'fatTotal': 'number/null', 'bodyMass': 'number/null', 'fatVisceral': 'number/null'}
         abort(make_response(jsonify(error, example), 400))
-    #elif not d.get('height') and not d.get('weight') and not d.get('waistline'):
-        #abort(400, 'Request must contain value for height, weight or waistline keyword')
+    if 'height' in d: validateNumber('height', d.get('height'))
+    if 'weight' in d: validateNumber('weight', d.get('weight'))
+    if 'waistline' in d: validateNumber('waistline', d.get('waistline'))
+    if 'fatTotal' in d: validateNumber('fatTotal', d.get('fatTotal'))
+    if 'bodyMass' in d: validateNumber('bodyMass', d.get('bodyMass'))
+    if 'fatVisceral' in d: validateNumber('fatVisceral', d.get('fatVisceral'))
     if (d.get('fatTotal') or d.get('bodyMass') or d.get('fatVisceral')) and not d.get('weight'):
         error = {'error': 'fatTotal, bodymass or fatVisceral needs value for weight'}
         example = {'measurementDate': d.get('measurementDate'), 'weight': 'Mandatory', 'fatTotal': d.get('fatTotal'), 'bodyMass': d.get('bodyMass'), 'fatVisceral': d.get('fatVisceral')}
@@ -253,25 +257,25 @@ def updateMeasurementItem(userId, dataId, d):
     if data:
         if d:
             validRequest = False
-            if 'measurementDate' in d and checkMeasurementDate(userId, d.get('measurementDate')):
+            if 'measurementDate' in d and validateDate(userId, d.get('measurementDate')):
                 validRequest = True
                 data.measurementDate = d.get('measurementDate')
-            if 'height' in d and d.get('height'):
+            if 'height' in d and validateNumber('height', d.get('height')):
                 validRequest = True
                 data.height = d.get('height')
-            if 'weight' in d and d.get('weight'):
+            if 'weight' in d and validateNumber('weight', d.get('weight')):
                 validRequest = True
                 data.weight = d.get('weight')
-            if 'waistline' in d and d.get('waistline'):
+            if 'waistline' in d and validateNumber('waistline', d.get('waistline')):
                 validRequest = True
                 data.waistline = d.get('waistline')
-            if 'fatTotal' in d and d.get('fatTotal'):
+            if 'fatTotal' in d and validateNumber('fatTotal', d.get('fatTotal')):
                 validRequest = True
                 data.fatTotal = d.get('fatTotal')
-            if 'fatVisceral' in d and d.get('fatVisceral'):
+            if 'fatVisceral' in d and validateNumber('fatVisceral', d.get('fatVisceral')):
                 validRequest = True
                 data.fatVisceral = d.get('fatVisceral')
-            if 'bodyMass' in d and d.get('bodyMass'):
+            if 'bodyMass' in d and validateNumber('bodyMass', d.get('bodyMass')):
                 validRequest = True
                 data.bodyMass = d.get('bodyMass')
             if not validRequest:
@@ -283,12 +287,16 @@ def updateMeasurementItem(userId, dataId, d):
                 session.commit()
                 return jsonify(data.serialize), 201
         else:
-            abort(make_response(jsonify(measurementDate='Optional', height='Optional', weight='Optional', waistline='Optional', fatTotal='Optional', bodyMass='Optional', fatVisceral='Optional'), 400))
+            error = {'error': 'No valid JSON in request'}
+            example = {'measurementDate': 'YYYY-MM-DD', 'height': 'number/null', 'weight': 'number/null', 'waistline': 'number/null', 'fatTotal': 'number/null', 'bodyMass': 'number/null', 'fatVisceral': 'number/null'}
+            abort(make_response(jsonify(error, example), 400))
+            #abort(make_response(jsonify(measurementDate='Optional', height='Optional', weight='Optional', waistline='Optional', fatTotal='Optional', bodyMass='Optional', fatVisceral='Optional'), 400))
     else:
         abort(make_response(jsonify(error='User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId)), 404))
 
 
 def deleteMeasurementItem(userId, dataId):
+    """Delete measurement item if owned by user"""
     data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
         session.delete(data)
@@ -299,59 +307,66 @@ def deleteMeasurementItem(userId, dataId):
 
 
 def hashPassword(password):
-    passwordHash = argon2.hash(password)
+    """Return argon2 hash created from string given as a argument"""
+    try:
+        passwordHash = argon2.hash(password)
+    except TypeError:
+        abort(make_response(jsonify(error='Password cannot be null nor int'), 400))
     return(passwordHash)
 
-def verifyPassword(userId, auth):
-    q = session.query(Users).add_columns('password').filter_by(id = userId).first()
+def verifyPassword(username, password):
+    """Return true if password matches hashed password of user"""
+    q = session.query(Users).add_columns('password').filter_by(username = username).first()
     if q:
-        return argon2.verify(auth.get('password'), q[1])
+        return argon2.verify(password, q[1])
     else:
-        abort(make_response(jsonify(error='No user with id %s' % userId), 404))
+        abort(make_response(jsonify(error='User %s not found' % username), 404))
 
-def generateAuthToken(userId, expiration):
+def generateToken(userId, username, expiration):
+    """Return token including user id and username, valid expiration time"""
     s = Serializer(secret_key, expires_in = expiration)
-    token = s.dumps({"id": userId })
+    token = s.dumps({'id': userId, 'username': username })
     return token
 
 def verifyToken(token):
+    """Return user id if valid token"""
     s = Serializer(secret_key)
     try:
         data = s.loads(token)
     except SignatureExpired:
         abort(make_response(jsonify(error='Session expired, login required'), 401))
-        #abort(401, 'Token expired, login required')
     except BadSignature:
-        abort(make_response(jsonify(error='Invalid signarure, login required'), 401))
-        abort(401, 'Invalid token, login required')
+        abort(make_response(jsonify(error='Invalid signature, login required'), 401))
     userId = data['id']
+    username = data['username']
     return userId
 
 def authenticate(userId, auth):
-    q = session.query(Users).add_columns('username', 'password').filter_by(id = userId).first()
-    if q:
+    """Return True if token is valid or correct username & password"""
+    if not auth.get('password'):
         return userId == verifyToken(auth.get('username'))
+    elif getUsername(userId) == auth.get('username'):
+        return verifyPassword(auth.get('username'), auth.get('password'))
     else:
-        abort(make_response(jsonify(error='No user with id %s' % userId), 404))
-
+        return False
 
 def checkUserId(username):
+    """Return user Id linked to username"""
     q = session.query(Users).add_columns('id').filter_by(username = username).first()
-    if q:
-        return q[1]
-    else:
-        return None
+    return q[1]
 
 def checkUsername(username):
+    """Return True if username is string 1 to 80 characters and username is not in use"""
+    if not username or isinstance(username, int) or len(username) > 80:
+        abort(make_response(jsonify(error='Username must be string 1 to 80 characters, not null nor int'), 400))
     q = session.query(Users).filter_by(username = username).first()
-    if not username:
-        abort(make_response(jsonify(error='Username cannot be empty'), 400))
-    elif q:
+    if q:
         abort(make_response(jsonify(error='Username %s is in use' % username), 400))
     else:
         return True
 
 def getUsername(userId):
+    """Return username linked to user Id"""
     q = session.query(Users).add_columns('username').filter_by(id = userId).first()
     if q:
         return q[1]
@@ -360,17 +375,46 @@ def getUsername(userId):
 
 
 def checkIfMeasurements(userId):
+    """Return None if user has no measurements"""
     q = session.query(Measurements).filter_by(userId = userId).first()
     return q
 
-def checkMeasurementDate(userId, measurementDate):
-    q = session.query(Measurements).add_columns('id').filter_by(userId = userId).filter_by(measurementDate = measurementDate).first()
-    if q:
-        abort(make_response(jsonify(error='User %s already has an measurement item id %s for date %s' % (getUsername(userId), q[1], measurementDate)), 400))
-    elif not measurementDate:
-        abort(make_response(jsonify(error='Measurement item must have date'), 400))
-    else:
+def validateString(key, value, maxLenght):
+    """Return True if value is None or string including 1 to 80 characters"""
+    if value is None or isinstance(value, str) and len(value) <= maxLenght and len(value) > 0:
         return True
+    else:
+        abort(make_response(jsonify(error='Value of key %s data type must be null or string including 1 to %s characters' % (key, maxLenght)), 400))
+
+def validateDate(userId, date):
+    """Return True if date is in YYYY-MM-DD format and user doesn't already have measurements with that date"""
+    if not userId and date == None:
+        return True
+    try:
+        datetime.datetime.strptime(date, '%Y-%m-%d')
+    except ValueError:
+        abort(make_response(jsonify(error='Date must be in YYYY-MM-DD format'), 400))
+    except TypeError:
+        abort(make_response(jsonify(error='Date must be in YYYY-MM-DD format'), 400))
+    if userId:
+        q = session.query(Measurements).add_columns('id').filter_by(userId = userId).filter_by(measurementDate = date).first()
+        if q:
+            abort(make_response(jsonify(error='User %s already has an measurement item id %s for date %s' % (getUsername(userId), q[1], date)), 400))
+    return True
+
+def validateGenre(genre):
+    """Return True if genre equals 'male', 'female' or None"""
+    if genre == "male" or genre == "female" or genre == None:
+        return True
+    else:
+        abort(make_response(jsonify(error='Value of key genre must be male, female or null'), 400))
+
+def validateNumber(key, value):
+    """Return True if value data type is None, Int or Float"""
+    if value is None or isinstance(value, (int, float)) and not isinstance(value, bool):
+        return True
+    else:
+        abort(make_response(jsonify(error='Value of key %s data type must be null or number' % key), 400))
 
 
 if __name__ == '__main__':
