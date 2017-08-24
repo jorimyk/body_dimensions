@@ -1,4 +1,4 @@
-from flask import Flask, request, abort, jsonify, make_response
+from flask import Flask, request, abort, jsonify, make_response, redirect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sqlalchemy import create_engine
@@ -23,17 +23,21 @@ limiter = Limiter(app, key_func=get_remote_address,
 
 secret_key = secret_key = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(32))
 
+@app.route('/hello')
+def hello():
+    return 'Hello, World'
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def index():
     if request.authorization:
         auth = request.authorization
+    elif request.form['username'] and request.form['password']:
+        auth = {'username': request.form['username'], 'password': request.form['password']}
     else:
-        return jsonify(error='Authorization required'), 401
+        return jsonify(error='username/password required'), 400
     if verifyPassword(auth.get('username'), auth.get('password')):
-#        return jsonify({'token': generateToken(checkUserId(auth.get('username')), auth.get('username'), 600).decode('ascii')})
         response = jsonify({'token': generateToken(checkUserId(auth.get('username')), auth.get('username'), 600).decode('ascii')})
-        response.headers['location'] = '/users/' + str(checkUserId(auth.get('username')))
+        response.headers['Content-Location'] = '/users/%s' % str(checkUserId(auth.get('username')))
         return response
     else:
         return jsonify(error='Invalid username/password'), 403
@@ -49,10 +53,12 @@ def users():
             return jsonify(error='Content Type must be application/json'), 400
     elif request.method == 'GET': # List all users
        return getAllUsers()
-    elif request.method == 'PUT': # Bulk update users
-        return jsonify(error='Bulk update users not implemented'), 501
-    elif request.method == 'DELETE': # Delete all users
-        return jsonify(error='Delete all users not implemented'), 501
+#    elif request.method == 'PUT': # Bulk update users
+#        return jsonify(error='Bulk update users not implemented'), 501
+#    elif request.method == 'DELETE': # Delete all users
+#        return jsonify(error='Delete all users not implemented'), 501
+    else:
+        return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
 
 @app.route('/users/<int:userId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>
@@ -78,7 +84,7 @@ def user(userId):
 
 
 @app.route('/users/<int:userId>/data', methods = ['POST', 'GET', 'DELETE']) # /users/<user>/data
-def measurement(userId):
+def measurements(userId):
     if request.authorization:
         auth = request.authorization
     else:
@@ -99,7 +105,7 @@ def measurement(userId):
 
 
 @app.route('/users/<int:userId>/data/<int:dataId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>/data/<data>
-def data(userId, dataId):
+def measurement(userId, dataId):
     if request.authorization:
         auth = request.authorization
     else:
@@ -120,8 +126,8 @@ def data(userId, dataId):
 
 
 def addNewUser(d):
-    """Create new user if valid username/password and if optional values are valid"""
-    example = {'firstName': 'string/null', 'lastName': 'string/null', 'genre': 'male/female/null', 'dateOfBirth': 'string(YYYY-MM-DD)/null', 'username': 'string (Mandatory)', 'password': 'string (Mandatory)'}
+    """Add new user to database if valid username/password and if optional values are valid in de"""
+    example = {'firstName': 'string/null', 'lastName': 'string/null', 'genre': 'male/female/null', 'dateOfBirth': 'string YYYY-MM-DD/null', 'username': 'string (Mandatory)', 'password': 'string (Mandatory)'}
     if d:
         if  'username' in d and 'password' in d:
             checkUsername(d.get('username'))
@@ -140,7 +146,7 @@ def addNewUser(d):
             session.commit()
             response = jsonify(user.serialize)
             response.status_code = 201
-            response.headers['location'] = '/users/' + str(user.id)
+            response.headers['Content-Location'] = '/users/' + str(user.id)
             return response
         else:
             error = {'error': 'invalid JSON keys/values'}
@@ -151,7 +157,7 @@ def addNewUser(d):
 
 
 def getAllUsers():
-    """Return all users in database"""
+    """Return all users from database"""
     users = session.query(Users).all()
     if users:
         return jsonify([i.serialize for i in users])
@@ -160,13 +166,14 @@ def getAllUsers():
 
 
 def getUser(userId):
-    """Return user details based on id"""
+    """Return user from database based on userId"""
     user = session.query(Users).filter_by(id = userId).first()
     return jsonify(user.serialize)
 
 
 def updateUser(userId, d):
-    example = {'firstName': 'string/null (if key exists)', 'lastName': 'string/null (if key exists)', 'genre': '(male/female/null) (if key exists)', 'dateOfBirth': 'YYYY-MM-DD/null (if key exists)', 'username': 'string (if key exists)', 'password': 'string (if key exists)'}
+    """Update user details if valid keys/values in d"""
+    example = {'firstName': 'string/null (if key exists)', 'lastName': 'string/null (if key exists)', 'genre': '(male/female/null) (if key exists)', 'dateOfBirth': 'string YYYY-MM-DD/null (if key exists)', 'username': 'string (if key exists)', 'password': 'string (if key exists)'}
     if d:
         user = session.query(Users).filter_by(id = userId).first()
         validRequest = False
@@ -201,20 +208,20 @@ def updateUser(userId, d):
 
 
 def deleteUser(userId):
+    """Delete user from database based on userId"""
     user = session.query(Users).filter_by(id = userId).first()
     session.delete(user)
     session.commit()
-    response = jsonify(result='user removed', userId=userId, username=user.username)
-    response.status_code = 200
-    return response
+    return jsonify(result='user removed', userId=userId, username=user.username),
 
 
 def addNewMeasurement(userId, d):
+    """Add new measurement item to database if valid JSON with valid keys/values in d"""
     if d:
         validateDate(userId, 'measurementDate', d.get('measurementDate'))
     else:
         error = {'error': 'no valid JSON'}
-        example = {'measurementDate': 'Mandatory, YYYY-MM-DD', 'height': 'number/null', 'weight': 'number/null', 'waistline': 'number/null', 'fatTotal': 'number/null', 'bodyMass': 'number/null', 'fatVisceral': 'number/null'}
+        example = {'measurementDate': 'Mandatory, string YYYY-MM-DD', 'height': 'number/null', 'weight': 'number/null', 'waistline': 'number/null', 'fatTotal': 'number/null', 'bodyMass': 'number/null', 'fatVisceral': 'number/null'}
         return jsonify(error, example), 400
     validateNumber('height', d.get('height'))
     validateNumber('weight', d.get('weight'))
@@ -240,11 +247,12 @@ def addNewMeasurement(userId, d):
         session.commit()
         response = jsonify(data.serialize)
         response.status_code = 201
-        response.headers['location'] = '/users/' + str(userId) + '/data/' + str(data.id)
+        response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data.id)
         return response
 
 
 def getMeasurements(userId):
+    """Return all user measurements from database based on user id"""
     data = session.query(Measurements).filter_by(userId = userId).all()
     if data:
         return jsonify([i.serialize for i in data])
@@ -253,6 +261,7 @@ def getMeasurements(userId):
 
 
 def deleteAllMeasurements(userId):
+    """Delete all user measurement items in database based on user id"""
     data = session.query(Measurements).filter_by(userId=userId).all()
     for index in range(len(data)):
         session.delete(data[index])
@@ -261,6 +270,7 @@ def deleteAllMeasurements(userId):
 
 
 def getMeasurementItem(userId, dataId):
+    """"Return single measurement item from database based on user id and data id"""
     data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
         return jsonify(data.serialize)
@@ -269,6 +279,8 @@ def getMeasurementItem(userId, dataId):
 
 
 def updateMeasurementItem(userId, dataId, d):
+    """Update user changes to database if valid values in d"""
+    example = {'measurementDate': 'string YYYY-MM-DD (if key exists)', 'height': 'number/null (if key exists)', 'weight': 'number/null (if key exists)', 'waistline': 'number/null (if key exists)', 'fatTotal': 'number/null (if key exists)', 'bodyMass': 'number/null (if key exists)', 'fatVisceral': 'number/null (if key exists)'}
     data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
         if d:
@@ -295,35 +307,35 @@ def updateMeasurementItem(userId, dataId, d):
                 validRequest = True
                 data.bodyMass = d.get('bodyMass')
             if not validRequest:
-                abort(make_response(jsonify(measurementDate=d.get('measurementDate'), height=d.get('height'), weight=d.get('weight'), waistline=d.get('waistline'), fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
+                error = {'error': 'no valid keys or nothing to be updated'}
+                return jsonify(error, example), 400
             elif (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) and not data.weight and not d.get('weight'):
-                abort(make_response(jsonify(weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400))
+                error = {'error': 'fatTotal, bodyMass and fatVisceral need value for weight'}
+                example = {'weight': 'Mandatory', 'fatTotal': d.get('fatTotal'), 'bodyMass': d.get('bodyMass'), 'fatVisceral': d.get('fatVisceral')}
+                return jsonify(error, example), 400
             else:
                 session.add(data)
                 session.commit()
-                return jsonify(data.serialize), 201
+                response = jsonify(data.serialize)
+                response.status_code = 201
+                response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data.id)
+                return response
         else:
             error = {'error': 'no valid JSON'}
-            example = {'measurementDate': 'YYYY-MM-DD', 'height': 'number/null', 'weight': 'number/null', 'waistline': 'number/null', 'fatTotal': 'number/null', 'bodyMass': 'number/null', 'fatVisceral': 'number/null'}
-            abort(make_response(jsonify(error, example), 400))
-            #abort(make_response(jsonify(measurementDate='Optional', height='Optional', weight='Optional', waistline='Optional', fatTotal='Optional', bodyMass='Optional', fatVisceral='Optional'), 400))
+            return jsonify(error, example), 400
     else:
-        abort(make_response(jsonify(error='User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId)), 404))
+        return jsonify(error='measurement not found', dataId=dataId, userId=userId, username=getUsername(userId)), 404
 
 
 def deleteMeasurementItem(userId, dataId):
-    """Delete measurement item if owned by user"""
+    """Delete measurement item from database if user id and data id matches"""
     data = session.query(Measurements).filter_by(userId = userId).filter_by(id = dataId).first()
     if data:
         session.delete(data)
         session.commit()
-        return jsonify(result='Removed measurements with id %s from user %s (id %s)' % (dataId, getUsername(userId), userId))
+        return jsonify(result='measurement removed', userId=userId, username=getUsername(userId), dataId=dataId)
     else:
-#        error = {'error': 'No measurement found'}
-        response = jsonify(error='not found', userId=userId, username=getUsername(userId), dataId=dataId)
-        response.status_code = 404
-        return response
-#        abort(404, 'User %s (id %s) does not have measurements with id %s' % (getUsername(userId), userId, dataId))
+        return jsonify(error='not found', userId=userId, username=getUsername(userId), dataId=dataId), 404
 
 
 def hashPassword(password):
@@ -331,7 +343,6 @@ def hashPassword(password):
     try:
         passwordHash = argon2.hash(password)
     except TypeError:
-#        abort(make_response(jsonify(error='Password cannot be null nor int'), 400))
         abort(make_response(jsonify(error='invalid password', password='string'), 400))
     return(passwordHash)
 
@@ -413,9 +424,9 @@ def validateDate(userId, key, date):
     try:
         datetime.datetime.strptime(date, '%Y-%m-%d')
     except ValueError:
-        abort(make_response(jsonify({'error': 'invalid value: %s' % date, key: 'YYYY-MM-DD (string)'}), 400))
+        abort(make_response(jsonify({'error': 'invalid value: %s' % date, key: 'string YYYY-MM-DD'}), 400))
     except TypeError:
-        abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (date, pythonTypeToJSONType(date)), key: 'YYYY-MM-DD (string)'}), 400))
+        abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (date, pythonTypeToJSONType(date)), key: 'string YYYY-MM-DD'}), 400))
     if userId:
         q = session.query(Measurements).add_columns('id').filter_by(userId = userId).filter_by(measurementDate = date).first()
         if q:
@@ -437,6 +448,7 @@ def validateNumber(key, value):
         abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'number/null'}), 400))
 
 def pythonTypeToJSONType(value):
+    """Convert Python data type to JSON data type"""
     if isinstance(value, dict): return 'object'
     elif isinstance(value, (list, tuple)): return 'array'
     elif isinstance(value, str): return 'string'
