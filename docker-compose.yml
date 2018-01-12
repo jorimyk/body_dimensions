@@ -1,0 +1,48 @@
+version: '3.3'
+services:
+#  frontend:
+#    image: nginx:latest
+#    ports:
+#      - "3000:80"
+#    volumes:
+#      - ./frontend:/usr/share/nginx/html:ro
+#    restart: always
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/opt/app
+    environment:
+      DB_URL: ${POSTGRES_DB_URL}
+#      DB_URL: ${MYSQL_DB_URL}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      FLASK_DEBUG: 1
+      FLASK_APP: bdimensions
+    ports:
+      - "5000:5000"
+    restart: always
+
+#  db:
+#    image: mariadb
+#    restart: always
+#    environment:
+#      MYSQL_HOST: ${DB_HOST}
+#      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PW}
+#      MYSQL_DATABASE: ${DB_NAME}
+#      MYSQL_USER: ${DB_USER}
+#      MYSQL_PASSWORD: ${DB_PASSWORD}
+
+  db:
+    image: postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
