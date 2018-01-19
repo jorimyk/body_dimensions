@@ -1,0 +1,11 @@
+flask
+flask_sqlalchemy
+flask_limiter
+flask_admin
+# For Postgres:
+psycopg2
+# For MySQL:
+#mysqlclient
+passlib
+argon2_cffi
+flask-cors

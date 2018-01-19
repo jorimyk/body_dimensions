@@ -1,0 +1,6 @@
+__pycache__/
+*.key
+*.tmp
+*.log
+*.swp
+.env

@@ -10,11 +10,11 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ./bd_api
     ports:
       - "5000:5000"
     volumes:
-      - ./backend:/opt/app
+      - ./bd_api:/opt/app
     environment:
       DB_URL: ${POSTGRES_DB_URL}
 #      DB_URL: ${MYSQL_DB_URL}
@@ -23,7 +23,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       FLASK_DEBUG: 1
-      FLASK_APP: bdimensions
+      FLASK_APP: bd_api
     ports:
       - "5000:5000"
     restart: always
