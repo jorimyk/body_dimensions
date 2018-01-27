@@ -7,5 +7,14 @@ class Config:
     db_password = os.environ['DB_PASSWORD']
     db_name = os.environ['DB_NAME']
 
-    #SQLAlchemy
+    # SQLAlchemy
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Flask_limiter
+    # default limits:
+    limit_per_day = "1000 per day"
+    limit_per_hour = "600 per hour"
+    limit_per_minute = "60 per minute"
+
+    #  itsdangerous
+    expiration = 600 # Access token expiration time in seconds
