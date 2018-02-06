@@ -1,9 +1,10 @@
-from flask import request, abort, jsonify, make_response
+from flask import request, jsonify, make_response
 
 from bd_api import app, db, limiter, auth
-from . models import User, Group
+from . models import User, Role
 from bd_api import Config
 from bd_api.utils import CommonUtils, UserUtils
+from bd_api.auth import Authenticate, Password, Token
 
 
 @app.route('/hello')
@@ -18,14 +19,17 @@ def login():
         auth = {'username': request.form['username'], 'password': request.form['password']}
     else:
         return jsonify(error='username/password required'), 400
-    if verifyPassword(auth.get('username'), auth.get('password')):
-        userId, role = getUserIdAndRole(auth.get('username'))
-        response = jsonify({'token': auth.generateToken(userId, auth.get('username'), role, expiration).decode('ascii')})
-        response.headers['Content-Location'] = '/users/%s' % str(userId)
-        response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
-        return response
+    if UserUtils.getUserIdAndRole(auth.get('username')):
+        if Password.verifyPassword(auth.get('username'), auth.get('password')):
+            userId, role = UserUtils.getUserIdAndRole(auth.get('username'))
+            response = jsonify({'token': Token.generateToken(userId, auth.get('username'), role, Config.expiration).decode('ascii')})
+            response.headers['Content-Location'] = '/users/%s' % str(userId)
+            response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
+            return response
+        else:
+            return jsonify(error='Invalid username/password'), 401
     else:
-        return jsonify(error='Invalid username/password'), 401
+        return  jsonify(error='user %s not found' % auth.get('username')), 400
 
 
 @app.route('/users', methods = ['POST', 'GET', 'PUT', 'DELETE']) # /users
@@ -33,12 +37,12 @@ def users():
     headers = request.headers
     if request.authorization:
         auth = request.authorization
-        if not auth.get('password'):
-            userId, username, role = verifyToken(auth.get('username'))
+        if isinstance(Authenticate.authenticate(auth), dict):
+            return jsonify(Authenticate.authenticate(auth)), 401
         else:
-            userId, role = getUserIdAndRole(auth.get('username'))
+            userId, role, username = Authenticate.authenticate(auth)
     else:
-        role = user
+        role = Role.USER
         userId = None
     if request.method == 'POST': # Add a new user
         if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
@@ -47,14 +51,14 @@ def users():
         else:
             return jsonify(error='Content Type must be application/json'), 400
     elif request.method == 'GET': # List all users
-        if role == 'admin':
+        if role == Role.ADMIN:
             return getAllUsers()
         else:
             return getAllPublicUsers(userId)
 #    elif request.method == 'PUT': # Bulk update users
 #        return jsonify(error='Bulk update users not implemented'), 501
     elif request.method == 'DELETE': # Delete all users
-        if role == 'admin':
+        if role == Role.ADMIN:
             return deleteUsers()
         else:
             return jsonify(error='Insufficient privileges'), 403
@@ -65,25 +69,31 @@ def users():
 @app.route('/users/<int:userId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>
 def user(userId):
     headers = request.headers
-    if request.authorization:
-        auth = request.authorization
-    elif request.method == 'GET' and checkIfPublicUser(userId):
+    if not UserUtils.userExists(userId):
+        return jsonify(error='No user with id %s' % userId), 404
+    elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
         return getUser(userId)
+    elif request.authorization:
+        auth = request.authorization
+        if isinstance(Authenticate.authenticate(auth), dict):
+            return jsonify(Authenticate.authenticate(auth)), 401
+        elif Authenticate.authenticate(auth)[0] == userId or Authenticate.authenticate(auth)[1] == Role.ADMIN:
+            if request.method == 'GET': # Show user with userId
+                return getUser(userId)
+            elif request.method == 'PUT': # Update user
+                if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
+                    d = request.get_json(silent=True)
+                    return updateUser(userId, d)
+                else:
+                    return jsonify(error='Content Type must be application/json'), 400
+            elif request.method == 'DELETE': # Delete user and all measurements for user
+                return deleteUser(userId)
+            else:
+                return jsonify(error='HTTP method %s not allowed' % request.method), 405
+        else:
+            return jsonify(error='Insufficient privileges'), 403
     else:
         return jsonify(error='Authorization required'), 401
-    if authenticate(userId, auth):
-        if request.method == 'GET': # Show user with userId
-            return getUser(userId)
-        elif request.method == 'PUT': # Update user
-            if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
-                d = request.get_json(silent=True)
-                return updateUser(userId, d)
-            else:
-                return jsonify(error='Content Type must be application/json'), 400
-        elif request.method == 'DELETE': # Delete user and all measurements for user
-            return deleteUser(userId)
-    else:
-        return jsonify(error='Invalid credentials'), 401
 
 
 def addNewUser(d):
@@ -112,12 +122,12 @@ def addNewUser(d):
             gender = d.get('gender'), \
             dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth')), \
             username = d.get('username'), \
-            password = auth.hashPassword(d.get('password')), \
+            password = Password.hashPassword(d.get('password')), \
             public = d.get('public'))
             db.session.add(user)
             db.session.commit()
             user = user.serialize
-            user['token'] = auth.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
+            user['token'] = Token.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
             response = jsonify(user)
             response.status_code = 201
             response.headers['Content-Location'] = '/users/' + str(user['id'])
@@ -138,7 +148,7 @@ def getAllUsers():
         users = [i.serialize for i in users]
         for index in users:
             index['numberOfMeasurements'] = CommonUtils.countNumberOfRows(index['id'])
-            index['dateOfBirth'] = convertToISODate(index['dateOfBirth'])
+            index['dateOfBirth'] = CommonUtils.convertToISODate(index['dateOfBirth'])
         return jsonify(users)
     else:
         return ('', 204)
@@ -159,7 +169,7 @@ def getAllPublicUsers(userId):
 
 def deleteUsers():
     """Delete all users with role user and their data"""
-    users = User.query.filter_by(role='user').all()
+    users = User.query.filter_by(role=1).all()
     numberOfMeasurementsDeleted = 0
     for index in range(len(users)):
         numberOfMeasurementsDeleted += deleteAllMeasurements(users[index].id, True)
@@ -173,7 +183,7 @@ def getUser(userId):
     user = User.query.filter_by(id = userId).first()
     user = user.serialize
     user['numberOfMeasurements'] = CommonUtils.countNumberOfRows(userId)
-    user['dateOfBirth'] = convertToISODate(user['dateOfBirth'])
+    user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
     return jsonify(user)
 
 
@@ -200,7 +210,7 @@ def updateUser(userId, d):
             user.username = d.get('username')
         if 'password' in d and d.get('password'):
             validRequest = True
-            user.password = auth.hashPassword(d.get('password'))
+            user.password = Password.hashPassword(d.get('password'))
         if 'public' in d and UserUtils.validateBoolean('public', d.get('public')):
             validRequest = True
             user.public = d.get('public')

@@ -1,15 +1,15 @@
 from bd_api import db
 
-class Group:
-    ADMIN = 1
-    USER = 2
+class Role:
+    ADMIN = 0
+    USER = 1
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     firstName = db.Column(db.String(80), nullable=True)
     lastName = db.Column(db.String(80), nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    group = db.Column(db.Integer)
+    role = db.Column(db.Integer, default = 1, nullable=False)
     gender = db.Column(db.String(6), nullable=True)
     dateOfBirth = db.Column(db.Date, nullable=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
@@ -22,7 +22,7 @@ class User(db.Model):
         return {
             'id': self.id,
             'email': self.email,
-            'group': self.group,
+            'role': self.role,
             'public': self.public,
             'username': self.username,
             'firstName': self.firstName,

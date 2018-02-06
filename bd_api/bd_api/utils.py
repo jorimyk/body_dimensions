@@ -6,6 +6,17 @@ from bd_api.users.measurements.models import Measurement
 
 class CommonUtils:
 
+    def getUsername(userId):
+        """Return username linked to user Id"""
+        q = User.query.add_columns('username').filter_by(id = userId).first()
+        if q:
+            return q[1]
+        else:
+            return {'error': 'not found', 'userId': userId}
+#            abort(make_response(jsonify(error='not found', userId=userId), 404))
+
+
+
     def validateDate(userId, key, date):
         """Return True if date is in ISO 8601 format and user doesn't already have measurements with that date"""
         if key == 'dateOfBirth' and date == None:
@@ -70,13 +81,19 @@ class CommonUtils:
 
 class UserUtils:
 
+    def userExists(userId):
+        return User.query.filter_by(id = userId).first()
+
+
     def getUserIdAndRole(username):
         """Return user Id linked to username"""
-        q = User.query.add_columns('id').add_columns('role').filter_by(username = username).first()
+        q = User.query.add_columns('id').add_columns('role').filter_by(username=username).first()
         if q:
             return q[1], q[2]
         else:
-            abort(make_response(jsonify(error='user %s not found' % username), 404))
+            return False
+#            return {'error': 'user %s not found' % username}
+#            abort(make_response(jsonify(error='user %s not found' % username), 404))
 
 
     def checkUsername(username):
@@ -90,15 +107,6 @@ class UserUtils:
 #            abort(make_response(jsonify(error='username %s is in use' % username), 400))
         else:
             return True
-
-
-    def getUsername(userId):
-        """Return username linked to user Id"""
-        q = User.query.add_columns('username').filter_by(id = userId).first()
-        if q:
-            return q[1]
-        else:
-            abort(make_response(jsonify(error='not found', userId=userId), 404))
 
 
     def checkIfPublicUser(userId):
@@ -140,7 +148,8 @@ class MeasurementUtils:
         if value is None or isinstance(value, (int, float)) and not isinstance(value, bool):
             return True
         else:
-            abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'number/null'}), 400)),
+            return {'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'number/null'}
+#            abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'number/null'}), 400)),
 
 
 def pythonTypeToJSONType(value):
