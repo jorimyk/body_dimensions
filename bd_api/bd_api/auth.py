@@ -9,7 +9,7 @@ from bd_api.utils import UserUtils
 class Authenticate:
 
     def authenticate(auth):
-        """Return True if token is valid or correct username & password"""
+        """Return userId, role and username if token is valid or correct username & password pair"""
         if auth.get('username') and not auth.get('password'):
             return Token.verifyToken(auth.get('username'))
         elif auth.get('username') and auth.get('password'):
@@ -25,7 +25,7 @@ class Authenticate:
 class Password:
 
     def hashPassword(password):
-        """Return argon2 hash created from string given as a argument"""
+        """Return argon2 hashed password"""
         try:
             passwordHash = argon2.hash(password)
         except TypeError:
@@ -38,8 +38,6 @@ class Password:
         q = User.query.add_columns('password').filter_by(username = username).first()
         if q:
             return argon2.verify(password, q[1])
-#        else:
-#            return {'error': 'not found: %s' % username}
 
 
 class Token:
