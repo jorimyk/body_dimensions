@@ -13,8 +13,6 @@ class CommonUtils:
             return q[1]
         else:
             return {'error': 'not found', 'userId': userId}
-#            abort(make_response(jsonify(error='not found', userId=userId), 404))
-
 
 
     def validateDate(userId, key, date):
@@ -29,26 +27,20 @@ class CommonUtils:
             try:
                 datetime.datetime.strptime(date, '%Y-%m-%dT%H:%M:%S.%fZ')
             except TypeError:
-#                abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (date, pythonTypeToJSONType(date)), key: 'date in ISO 8601 format'}), 400))
                 return {'error': 'invalid value: %s (%s)' % (date, pythonTypeToJSONType(date)), key: 'date in ISO 8601 format'}
             except ValueError:
-#                abort(make_response(jsonify({'error': 'invalid value: %s' % date, key: 'date in ISO 8601 format'}), 400))
                 return {'error': 'invalid value: %s' % date, key: 'date in ISO 8601 format'}
         else:
             try:
                 datetime.datetime.strptime(date, '%Y-%m-%d')
             except TypeError:
-#                abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (date, pythonTypeToJSONType(date)), key: 'date in ISO 8601 format'}), 400))
                 return {'error': 'invalid value: %s (%s)' % (date, pythonTypeToJSONType(date)), key: 'date in ISO 8601 format'}
             except ValueError:
-#                abort(make_response(jsonify({'error': 'invalid value: %s' % date, key: 'date in ISO 8601 format'}), 400))
                 return {'error': 'invalid value: %s' % date, key: 'date in ISOOO 8601 format'}
 
         if userId:
-#            q = session.query(Measurements).add_columns('id').filter_by(userId = userId).filter_by(measurementDate = date).first()
             q = Measurement.query.add_columns('id').filter_by(userId = userId).filter_by(measurementDate = date).first()
             if q:
-#                abort(make_response(jsonify(error='duplicate value found: %s' % date, dataId=q[1], userId=userId, username=getUsername(userId)), 400))
                 return {'error': 'duplicate value found: %s' % date, 'dataId': q[1], 'userId': userId, 'username': getUsername(userId)}
             else:
                 return True
@@ -92,19 +84,15 @@ class UserUtils:
             return q[1], q[2]
         else:
             return False
-#            return {'error': 'user %s not found' % username}
-#            abort(make_response(jsonify(error='user %s not found' % username), 404))
 
 
     def checkUsername(username):
         """Return True if username is string 1 to 80 characters and username is not in use"""
         if not username or not isinstance(username, str) or len(username) > 80:
             return {'error': 'invalid username: %s (%s)' % (username, pythonTypeToJSONType(username)), 'username': 'string (not empty)'}
-#            abort(make_response(jsonify(error= 'invalid username: %s (%s)' % (username, pythonTypeToJSONType(username)), username= 'string (not empty)'), 400))
         q = User.query.filter_by(username = username).first()
         if q:
             return {'error': 'username %s is in use' % username}
-#            abort(make_response(jsonify(error='username %s is in use' % username), 400))
         else:
             return True
 
@@ -119,7 +107,6 @@ class UserUtils:
         if value is None or isinstance(value, str) and len(value) <= maxLenght and len(value) > 0:
             return True
         else:
-#            abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'string (not empty)/null'}), 400))
             return {'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'string (not empty)/null'}
 
 
@@ -128,7 +115,6 @@ class UserUtils:
         if gender == "male" or gender == "female" or gender == None:
             return True
         else:
-#            abort(make_response(jsonify(error='invalid value: %s (%s)' % (gender, pythonTypeToJSONType(gender)), gender='male/female/null'), 400))
             return {'error': 'invalid value: %s (%s)' % (gender, pythonTypeToJSONType(gender)), 'gender': 'male/female/null'}
 
 
@@ -137,7 +123,6 @@ class UserUtils:
         if value is None or isinstance(value, bool):
             return True
         else:
-#            abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'boolean/null'}), 400))
             return {'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'boolean/null'}
 
 
@@ -149,7 +134,6 @@ class MeasurementUtils:
             return True
         else:
             return {'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'number/null'}
-#            abort(make_response(jsonify({'error': 'invalid value: %s (%s)' % (value, pythonTypeToJSONType(value)), key: 'number/null'}), 400)),
 
 
 def pythonTypeToJSONType(value):
