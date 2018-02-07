@@ -7,9 +7,12 @@ from bd_api.utils import CommonUtils, UserUtils
 from bd_api.auth import Authenticate, Password, Token
 
 
-@app.route('/hello')
-def hello():
-    return 'Hello, World'
+# Creeate admin account if no users in database
+if not User.query.all():
+    admin = User(username='admin', email=Config.admin_email , password=Password.hashPassword(Config.admin_password), role=Role.ADMIN)
+    db.session.add(admin)
+    db.session.commit()
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -88,8 +91,8 @@ def user(userId):
                     return jsonify(error='Content Type must be application/json'), 400
             elif request.method == 'DELETE': # Delete user and all measurements for user
                 return deleteUser(userId)
-            else:
-                return jsonify(error='HTTP method %s not allowed' % request.method), 405
+#            else:
+#                return jsonify(error='HTTP method %s not allowed' % request.method), 405
         else:
             return jsonify(error='Insufficient privileges'), 403
     else:

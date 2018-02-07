@@ -24,6 +24,8 @@ services:
       DB_NAME: ${DB_NAME}
       FLASK_DEBUG: 1
       FLASK_APP: bd_api
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
       - "5000:5000"
     restart: always

@@ -1,6 +1,7 @@
 import os
 
 class Config:
+    # database
     db_url = os.environ['DB_URL']
     db_host = os.environ['DB_HOST']
     db_user = os.environ['DB_USER']
@@ -18,3 +19,7 @@ class Config:
 
     #  itsdangerous
     expiration = 600 # Access token expiration time in seconds
+
+    # admin
+    admin_password = os.environ['ADMIN_PASSWORD']
+    admin_email = os.environ['ADMIN_EMAIL']
