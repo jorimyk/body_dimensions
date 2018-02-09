@@ -172,7 +172,7 @@ def getAllPublicUsers(userId):
 
 def deleteUsers():
     """Delete all users with role user and their data"""
-    users = User.query.filter_by(role=1).all()
+    users = User.query.filter_by(role=Role.USER).all()
     numberOfMeasurementsDeleted = 0
     for index in range(len(users)):
         numberOfMeasurementsDeleted += deleteAllMeasurements(users[index].id, True)
@@ -196,27 +196,42 @@ def updateUser(userId, d):
     if d:
         user = User.query.filter_by(id = userId).first()
         validRequest = False
-        if 'firstName' in d and UserUtils.validateString('firstName', d.get('firstName'), 80):
+        if 'firstName' in d and not isinstance(UserUtils.validateString('firstName', d.get('firstName'), 80), dict):
             validRequest = True
             user.firstName = d.get('firstName')
-        if 'lastName' in d and UserUtils.validateString('lastName', d.get('lastName'), 80):
+        else:
+            return jsonify(UserUtils.validateString('firstName', d.get('firstName'), 80)), 400
+        if 'lastName' in d and not isinstance(UserUtils.validateString('lastName', d.get('lastName'), 80), dict):
             validRequest = True
             user.lastName = d.get('lastName')
-        if 'gender' in d and UserUtils.validateGender(d.get('gender')):
+        else:
+            return jsonify(UserUtils.validateString('lastName', d.get('lastName'), 80)), 400
+        if 'gender' in d and not isinstance(UserUtils.validateGender(d.get('gender')), dict):
             validRequest = True
             user.gender = d.get('gender')
-        if 'dateOfBirth' in d and CommonUtils.validateDate(userId, 'dateOfBirth', d.get('dateOfBirth')):
+        else:
+            return jsonify(UserUtils.validateGender(d.get('gender'))), 400
+        if 'dateOfBirth' in d and not isinstance(CommonUtils.validateDate(userId, 'dateOfBirth', d.get('dateOfBirth')), dict):
             validRequest = True
             user.dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth'))
-        if 'username' in d and checkUsername(d.get('username')):
+        else:
+            return jsonify(CommonUtils.validateDate(userId, 'dateOfBirth', d.get('dateOfBirth'))), 400
+        if 'username' in d and not isinstance(checkUsername(d.get('username')), dict):
             validRequest = True
             user.username = d.get('username')
+        else:
+            return jsonify(checkUsername(d.get('username')))
         if 'password' in d and d.get('password'):
             validRequest = True
-            user.password = Password.hashPassword(d.get('password'))
-        if 'public' in d and UserUtils.validateBoolean('public', d.get('public')):
+            if isinstance(Password.hashPassword(d.get('password')), dict):
+                return jsonify(Password.hashPassword(d.get('password'))), 400
+            else:
+                user.password = Password.hashPassword(d.get('password'))
+        if 'public' in d and not isinstance(UserUtils.validateBoolean('public', d.get('public')), dict):
             validRequest = True
             user.public = d.get('public')
+        else:
+            return jsonify(UserUtils.validateBoolean('public', d.get('public'))), 400
         if validRequest:
             session.add(user)
             session.commit()
