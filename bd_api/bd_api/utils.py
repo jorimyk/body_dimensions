@@ -91,6 +91,12 @@ class UserUtils:
         return User.query.filter_by(public = True).filter_by(id = userId).first()
 
 
+class MeasurementUtils:
+
+    def validate_measurement_values(measurement_request):
+        measurement_validation = {}
+
+
 def validate_username(username):
     """Return None if username is string 1 to 80 characters and username is not in use"""
     if not username or not isinstance(username, str) or len(username) > 80:
@@ -107,7 +113,7 @@ def validateNumber(key, value):
     if value is None or isinstance(value, (int, float)) and not isinstance(value, bool):
         return None
     else:
-        return {'error': 'invalid value: %s (%s), valid value number/null' % (value, pythonTypeToJSONType(value))}
+        return {'error': 'invalid value: %s (%s), valid values number/null' % (value, pythonTypeToJSONType(value))}
 
 
 def validateString(key, value, maxLenght):
@@ -131,7 +137,7 @@ def validateBoolean(key, value):
     if value is None or isinstance(value, bool):
         return None
     else:
-        return {'error': 'invalid value: %s (%s), valid value boolean/null' % (value, pythonTypeToJSONType(value))}
+        return {'error': 'invalid value: %s (%s), valid values boolean/null' % (value, pythonTypeToJSONType(value))}
 
 
 def validateDate(userId, key, date):
