@@ -182,52 +182,32 @@ def updateUser(userId, d):
     """Update user details if valid keys/values in d"""
     errorResponse = {'firstName': 'string/null (if key exists)', 'lastName': 'string/null (if key exists)', 'gender': '(male/female/null) (if key exists)', 'dateOfBirth': 'string YYYY-MM-DD/null (if key exists)', 'username': 'string (if key exists)', 'password': 'string (if key exists)', 'public': 'boolean/null (if key exists'}
     if d:
-        user = User.query.filter_by(id = userId).first()
-        validRequest = False
-        if 'firstName' in d and not isinstance(UserUtils.validateString('firstName', d.get('firstName'), 80), dict):
-            validRequest = True
-            user.firstName = d.get('firstName')
-        else:
-            return jsonify(UserUtils.validateString('firstName', d.get('firstName'), 80)), 400
-        if 'lastName' in d and not isinstance(UserUtils.validateString('lastName', d.get('lastName'), 80), dict):
-            validRequest = True
-            user.lastName = d.get('lastName')
-        else:
-            return jsonify(UserUtils.validateString('lastName', d.get('lastName'), 80)), 400
-        if 'gender' in d and not isinstance(UserUtils.validateGender(d.get('gender')), dict):
-            validRequest = True
-            user.gender = d.get('gender')
-        else:
-            return jsonify(UserUtils.validateGender(d.get('gender'))), 400
-        if 'dateOfBirth' in d and not isinstance(CommonUtils.validateDate(userId, 'dateOfBirth', d.get('dateOfBirth')), dict):
-            validRequest = True
-            user.dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth'))
-        else:
-            return jsonify(CommonUtils.validateDate(userId, 'dateOfBirth', d.get('dateOfBirth'))), 400
-        if 'username' in d and not isinstance(checkUsername(d.get('username')), dict):
-            validRequest = True
-            user.username = d.get('username')
-        else:
-            return jsonify(checkUsername(d.get('username')))
-        if 'password' in d and d.get('password'):
-            validRequest = True
-            if isinstance(Password.hashPassword(d.get('password')), dict):
-                return jsonify(Password.hashPassword(d.get('password'))), 400
+        if any(key in d for key in User.user_keys):
+            if not UserUtils.validate_user_values(d):
+                user = User.query.filter_by(id = userId).first()
+                if d.get('firstName'):
+                    user.firstName = d.get('firstName')
+                if d.get('lastName'):
+                    user.lastName = d.get('lastName')
+                if d.get('gender'):
+                    user.gender = d.get('gender')
+                if d.get('dateOfBirth'):
+                    user.dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth'))
+                if d.get('username'):
+                    user.username = d.get('username')
+                if d.get('password'):
+                    user.password = Password.hashPassword(d.get('password'))
+                if d.get('public'):
+                    user.public = d.get('public')
+                db.session.add(user)
+                db.session.commit()
+                user = user.serialize
+                user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
+                return jsonify(user), 201
             else:
-                user.password = Password.hashPassword(d.get('password'))
-        if 'public' in d and not isinstance(UserUtils.validateBoolean('public', d.get('public')), dict):
-            validRequest = True
-            user.public = d.get('public')
+                return jsonify(UserUtils.validate_user_values(d)), 400
         else:
-            return jsonify(UserUtils.validateBoolean('public', d.get('public'))), 400
-        if validRequest:
-            session.add(user)
-            session.commit()
-            user = user.serialize
-            user['dateOfBirth'] = convertToISODate(user['dateOfBirth'])
-            return jsonify(user), 201
-        else:
-            errorResponse['error'] = 'No valid keys or nothing to be updated'
+            errorResponse['error'] = 'No valid keys'
             return jsonify(errorResponse), 400
     else:
         errorResponse['error'] = 'no valid JSON in request'

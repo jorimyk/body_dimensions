@@ -30,3 +30,14 @@ class User(db.Model):
             'gender' : self.gender,
             'dateOfBirth' : self.dateOfBirth
         }
+
+
+    user_keys = ['firstName',
+                'lastName',
+                'email',
+                'role',
+                'gender',
+                'dateOfBirth',
+                'username',
+                'password',
+                'public']
