@@ -104,20 +104,8 @@ def addNewUser(d):
     errorResponse = {'firstName': 'string/null', 'lastName': 'string/null', 'gender': 'male/female/null', 'dateOfBirth': 'string YYYY-MM-DD/null', 'username': 'string (Mandatory)', 'password': 'string (Mandatory)', 'public': 'boolean/null'}
     if d:
         if  'username' in d and 'password' in d and 'email' in d:
-            if isinstance(UserUtils.checkUsername(d.get('username')), dict):
-                return jsonify(UserUtils.checkUsername(d.get('username'))), 400
-            if isinstance(UserUtils.validateString('email', d.get('email'), 120), dict):
-                return jsonify(UserUtils.validateString('email', d.get('email'), 120)), 400
-            if isinstance(UserUtils.validateString('firstName', d.get('firstName'), 80), dict):
-                return jsonify(UserUtils.validateString('firstName', d.get('firstName'), 80)), 400
-            if isinstance(UserUtils.validateString('lastName', d.get('lastName'), 80), dict):
-                return jsonify(UserUtils.validateString('lastName', d.get('lastName'), 80)), 400
-            if isinstance(UserUtils.validateGender(d.get('gender')), dict):
-                return jsonify(UserUtils.validateGender(d.get('gender'))), 400
-            if isinstance(CommonUtils.validateDate(None, 'dateOfBirth', d.get('dateOfBirth')), dict):
-                return jsonify(CommonUtils.validateDate(None, 'dateOfBirth', d.get('dateOfBirth'))), 400
-            if isinstance(UserUtils.validateBoolean('public', d.get('public')), dict):
-                return jsonify(UserUtils.validateBoolean('public', d.get('public'))), 400
+            if UserUtils.validate_user_values(d):
+                return jsonify(UserUtils.validate_user_values(d)), 400
             user = User( \
             firstName = d.get('firstName'), \
             lastName = d.get('lastName'), \
