@@ -28,3 +28,11 @@ class Measurement(db.Model):
             'fatVisceral' : self.fatVisceral,
             'waistline' : self.waistline
         }
+
+    measurement_keys = ['measurementDate',
+                        'height',
+                        'weight',
+                        'fatTotal',
+                        'bodyMass',
+                        'fatVisceral',
+                        'waistline']

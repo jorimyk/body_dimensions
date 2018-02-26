@@ -100,6 +100,14 @@ class MeasurementUtils:
 
     def validate_measurement_values(userId, measurement_request):
         measurement_validation = {}
+        for key, value in measurement_request.items():
+            if key == 'measurementDate':
+                if validateDate(userId, key, value):
+                    measurement_validation[key] = validateDate(userId, key, value)['error']
+            elif key in Measurement.measurement_keys:
+                if validateNumber(key, value):
+                    measurement_validation[key] = validateNumber(key, value)['error']
+        return measurement_validation
 
 
 def validate_username(username):
@@ -169,9 +177,9 @@ def validateDate(userId, key, date):
             return {'error': 'invalid value: %s, valid value date in ISO 8601 format' % date}
 
     if userId:
-        q = Measurement.query.add_columns('id').filter_by(userId = userId).filter_by(measurementDate = date).first()
+        q = Measurement.query.add_columns('id').filter_by(user_id = userId).filter_by(measurementDate = date).first()
         if q:
-            return {'error': 'duplicate value found for date %s (dataId %s)' % (date, q[1])}
+            return {'error': 'duplicate value found for date %s (data id %s)' % (date, q[1])}
         else:
             return None
 
