@@ -72,7 +72,7 @@ def users():
 @app.route('/users/<int:userId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>
 def user(userId):
     headers = request.headers
-    if not UserUtils.userExists(userId):
+    if not CommonUtils.userExists(userId):
         return jsonify(error='No user with id %s' % userId), 404
     elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
         return getUser(userId)
@@ -164,8 +164,8 @@ def deleteUsers():
     numberOfMeasurementsDeleted = 0
     for index in range(len(users)):
         numberOfMeasurementsDeleted += deleteAllMeasurements(users[index].id, True)
-        session.delete(users[index])
-        session.commit()
+        db.session.delete(users[index])
+        db.session.commit()
     return jsonify(nubmerOfUsersDeleted=len(users), numberOfMeasurementsDeleted=numberOfMeasurementsDeleted)
 
 
@@ -218,6 +218,6 @@ def deleteUser(userId):
     """Delete user from database based on userId"""
     numberOfMeasurementsDeleted = deleteAllMeasurements(userId, True)
     user = User.query.filter_by(id = userId).first()
-    session.delete(user)
-    session.commit()
+    db.session.delete(user)
+    db.session.commit()
     return jsonify(result='user removed', numberOfMeasurementsDeleted=numberOfMeasurementsDeleted, userId=userId, username=user.username)
