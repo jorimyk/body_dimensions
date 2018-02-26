@@ -9,3 +9,4 @@ psycopg2
 passlib
 argon2_cffi
 flask-cors
+validate_email

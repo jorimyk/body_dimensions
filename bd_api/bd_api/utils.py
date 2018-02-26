@@ -1,5 +1,7 @@
 import datetime
 
+from validate_email import validate_email
+
 from bd_api import db
 from bd_api.users.models import User
 from bd_api.users.measurements.models import Measurement
@@ -51,8 +53,11 @@ class UserUtils:
             if validateString('password', user_request.get('password'), 80):
                 user_validation['password'] = validateString('password', user_request.get('password'), 120)['error']
         if user_request.get('email'):
-            if validateString('email', user_request.get('email'), 120):
-                user_validation['email'] = validateString('email', user_request.get('email'), 120)['error']
+            if isinstance(user_request.get('email'), str):
+                if not validate_email(user_request.get('email')):
+                    user_validation['email'] = 'invalid email %s' % user_request.get('email')
+            else:
+                user_validation['email'] = 'invalid email %s (%s)' % (user_request.get('email'), pythonTypeToJSONType(user_request.get('email')))
         if user_request.get('firstName'):
             if validateString('firstName', user_request.get('firstName'), 80):
                 user_validation['firstName'] = validateString('firstName', user_request.get('firstName'), 80)['error']
@@ -93,7 +98,7 @@ class UserUtils:
 
 class MeasurementUtils:
 
-    def validate_measurement_values(measurement_request):
+    def validate_measurement_values(userId, measurement_request):
         measurement_validation = {}
 
 
@@ -141,7 +146,7 @@ def validateBoolean(key, value):
 
 
 def validateDate(userId, key, date):
-    """Return Nonen if date is in ISO 8601 format and user doesn't already have measurements with that date"""
+    """Return None if date is in ISO 8601 format and user doesn't already have measurements with that date"""
     if key == 'dateOfBirth' and date == None:
         return None
 
