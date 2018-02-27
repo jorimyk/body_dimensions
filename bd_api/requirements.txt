@@ -3,7 +3,7 @@ flask_sqlalchemy
 flask_limiter
 flask_admin
 # For Postgres:
-psycopg2
+psycopg2-binary
 # For MySQL:
 #mysqlclient
 passlib
