@@ -98,6 +98,10 @@ class UserUtils:
 
 class MeasurementUtils:
 
+    def measurement_exists(userId, dataId):
+        return Measurement.query.filter_by(id = dataId).filter_by(user_id = userId).first()
+
+
     def validate_measurement_values(userId, measurement_request):
         measurement_validation = {}
         for key, value in measurement_request.items():
