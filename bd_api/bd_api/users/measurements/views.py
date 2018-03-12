@@ -134,7 +134,7 @@ def updateMeasurementItem(userId, dataId, d):
     errorResponse = {'measurementDate': 'string YYYY-MM-DD (if key exists)', 'height': 'number/null (if key exists)', 'weight': 'number/null (if key exists)', 'waistline': 'number/null (if key exists)', 'fatTotal': 'number/null (if key exists)', 'bodyMass': 'number/null (if key exists)', 'fatVisceral': 'number/null (if key exists)'}
     if d:
         if any(key in d for key in Measurement.measurement_keys):
-            if not MeasurementUtils.validate_measurement_values(d):
+            if not MeasurementUtils.validate_measurement_values(userId, d):
                 data = Measurement.query.filter_by(user_id = userId).filter_by(id = dataId).first()
                 if 'measurementDate' in d:
                     data.measurementDate = CommonUtils.convertFromISODate(d.get('measurementDate'))
@@ -164,7 +164,7 @@ def updateMeasurementItem(userId, dataId, d):
                     response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
                     return response
             else:
-                return jsonify(MeasurementUtils.validate_measurement_values(d)), 400
+                return jsonify(MeasurementUtils.validate_measurement_values(userId, d)), 400
         else:
             errorResponse['error'] = 'no valid keys or nothing to be updated'
             return jsonify(errorResponse), 400
