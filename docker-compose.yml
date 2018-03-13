@@ -1,12 +1,12 @@
 version: '3.3'
 services:
-#  frontend:
-#    image: nginx:latest
-#    ports:
-#      - "3000:80"
-#    volumes:
-#      - ./frontend:/usr/share/nginx/html:ro
-#    restart: always
+  frontend:
+    image: nginx:latest
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    restart: always
 
   backend:
     build:
