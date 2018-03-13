@@ -1,0 +1,457 @@
+ <!DOCTYPE html>
+<html>
+<head>
+<title>Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"/>
+<style>
+table, th, td {
+    border: 1px solid black;
+}
+th {
+    text-align: left;
+}
+</style>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src='https://www.google.com/recaptcha/api.js'></script>
+<script>
+
+// Use let and const in modern browsers instead of var.
+// Let can be modified later, const is constant.
+let url = 'http://0.0.0.0:5000';
+
+if(window.location.hostname !== 'localhost') {
+  // If not in localhost, set url to `api.hostname`
+  url = `http://api.${window.location.hostname}`
+}
+
+console.log('api url', url)
+
+var isAuthenticated = false;
+
+$(document).ready(function() {
+  logout();
+  $("#divLogin").hide();
+  $("#divCreateUser").hide();
+  $("#divReadUser").hide();
+  $("#divCreateMeasurement").hide();
+  $("#divReadMeasurements").hide();
+  $("#divReadMeasurement").hide();
+  $("#login").click(function() {
+    $("#divLogin").show();
+    $("#divCreateUser").hide();
+    $("#divReadUser").hide();
+    $("#divReadUsers").hide();
+  });
+  $("#logout").click(function() {
+    logout();
+  });
+  $("#readUsers").click(function() {
+    $("#tableUsers").empty();
+    getUsers();
+    $("#divLogin").hide();
+    $("#divCreateUser").hide();
+    $("#divReadUser").hide();
+    $("#divReadUsers").show();
+  });
+  $("#createUser").click(function() {
+//    logout();
+    $("#divLogin").hide();
+    $("#divCreateUser").show();
+    $("#divReadUser").hide();
+    $("#divReadUsers").hide();
+  });
+  $("#readUser").click(function() {
+    $("#tableUser").empty();
+    getUser();
+    $("#divLogin").hide();
+    $("#divCreateUser").hide();
+    $("#divReadUser").show();
+    $("#divReadUsers").hide();
+    $("#divReadMeasurements").hide();
+    $("#divCreateMeasurement").hide();
+  });
+  $("#createMeasurement").click(function() {
+    $("#divReadUser").hide();
+    $("#divReadUsers").hide();
+    $("#divCreateMeasurement").show();
+    $("#divReadMeasurements").hide();
+  });
+  $("#readMeasurements").click(function() {
+    $("#tableMeasurements").empty();
+    getMeasurements();
+    $("#divReadUser").hide();
+    $("#divReadUsers").hide();
+    $("#divReadMeasurements").show();
+    $("#divCreateMeasurement").hide();
+  });
+
+
+  $("#formLogin").submit(function(event) {
+    var username = "";
+    var password = "";
+    var fields = $(this).serializeArray();
+    $.each( fields, function( i, field ) {
+      if (field.name === "username") {
+        username = field.value;
+      } else if (field.name === "password") {
+        password = field.value;
+      }
+    });
+    $.ajax ({
+      method: "GET",
+      url: url + "/login",
+      dataType: "json",
+      headers: { "Authorization": "Basic " + btoa(username + ":" + password) }
+    })
+    .done(function(json, status, request) {
+      sessionStorage.setItem("token", json.token);
+      sessionStorage.setItem("userPath", request.getResponseHeader('Content-Location'));
+      login();
+      console.log('login success');
+    })
+    .fail(function(err, request, status) {
+      console.log('error:', status, err);
+    });
+    event.preventDefault();
+  });
+
+
+  $("#formPostUser").submit(function(event) {
+    var obj = {};
+    var fields = $(this).serializeArray();
+    $.each( fields, function( i, field ) {
+      if (field.value === "") {
+        field.value = null;
+      }
+      if (field.name === "dateOfBirth" && field.value !== null) {
+        var d = new Date(field.value);
+        obj[field.name] = d.toJSON();
+      } else if (field.name === "public") {
+        if (field.value === "1") {
+          obj["public"] = true;
+        } else {
+          obj["public"] = false;
+        }
+      } else {
+        obj[field.name] = field.value;
+      }
+    });
+    obj = JSON.stringify(obj);
+    $.ajax({
+      method: "POST",
+      url: url + "/users",
+      contentType: "application/json; charset=utf-8",
+      data: obj,
+      dataType: "json"
+    })
+    .done(function(json, status, request) {
+      sessionStorage.setItem("token", json.token);
+      sessionStorage.setItem("userPath", request.getResponseHeader('Content-Location'));
+      $("#getUsername").text(json.username);
+      $("#getFirstName").text(json.firstName);
+      $("#getLastName").text(json.lastName);
+      $("#getGender").text(json.gender);
+      $("#getDateOfBirth").text(json.dateOfBirth);
+      if (json.public === true){
+        $("#getPublic").text("Yes");
+      } else {
+        $("#getPublic").text("No");
+      }
+      login();
+      $("#divCreateUser").hide();
+      console.log("success");
+    })
+    .fail(function(err, request, status) {
+      console.log('error:', status, err);
+    })
+    .always(function() {
+      console.log("complete");
+    });
+    console.log(obj);
+    event.preventDefault();
+  });
+
+
+  function getUsers() {
+    if (isAuthenticated === true) {
+      $.ajax ({
+        method: "GET",
+        url: url + "/users",
+        dataType: "json",
+        headers: { "Authorization": "Basic " + btoa(sessionStorage.getItem("token") + ":") }
+      })
+      .done(function(json, status, request) {
+        console.log('getusers.done (Authenticated)')
+        $(json).each(function(i) {
+          generateUserTable("#tableUsers", json[i].username, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements)
+        })
+        console.log(json);
+      })
+      .fail(function(err, request, status) {
+        logout();
+        console.log('error:', status, err);
+      })
+      .always(function() {
+        console.log("completed" );
+      });
+    } else {
+      $.ajax ({
+        method: "GET",
+        url: url + "/users",
+        dataType: "json"
+      })
+      .done(function(json, status, request) {
+        console.log('getusers.done (Unauthenticated)')
+        console.log('json', json);
+        $(json).each(function(i) {
+          generateUserTable("#tableUsers", json[i].username, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements, json[i].public)
+        })
+        console.log('json', json);
+      })
+      .fail(function(err, request, status) {
+        console.log('error:', status, err);
+      })
+      .always(function() {
+        console.log("completed" );
+      });
+    }
+  }
+
+
+  function getUser(){
+    $.ajax ({
+      method: "GET",
+      url: url + sessionStorage.getItem("userPath"),
+      dataType: "json",
+      headers: { "Authorization": "Basic " + btoa(sessionStorage.getItem("token") + ":") }
+    })
+    .done(function(json, status, request) {
+      generateUserTable("#tableUser", json.username, json.firstName, json.lastName, json.gender, json.dateOfBirth, json.numberOfMeasurements, json.public)
+      console.log(json);
+    })
+    .fail(function(err, request, status) {
+      logout();
+      console.log('error:', status, err);
+    })
+    .always(function() {
+      console.log("completed" );
+    });
+  }
+
+
+  $("#formPostMeasurement").submit(function(event) {
+    var obj = {};
+    var fields = $(this).serializeArray();
+    $.each( fields, function( i, field ) {
+      if (field.value === "") {
+        field.value = null;
+      }
+      if (field.name === "measurementDate") {
+        var d = new Date(field.value);
+        obj[field.name] = d.toJSON();
+      } else {
+        obj[field.name] = Number(field.value);
+      }
+      console.log(obj);
+    });
+    obj = JSON.stringify(obj);
+    $.ajax({
+      method: "POST",
+      url: url + sessionStorage.getItem("userPath") + "/data",
+      contentType: "application/json; charset=utf-8",
+      data: obj,
+      dataType: "json",
+      headers: { "Authorization": "Basic " + btoa(sessionStorage.getItem("token") + ":") }
+    })
+    .done(function(json, status, request) {
+      console.log("Success!", json)
+    })
+    .fail(function(err, request, status) {
+      console.log('error:', status, err);
+    })
+    .always(function() {
+      console.log("complete");
+    });
+    console.log(obj);
+    event.preventDefault();
+  });
+
+
+  function getMeasurements() {
+    $.ajax ({
+      method: "GET",
+      url: url + sessionStorage.getItem("userPath") + "/data",
+      dataType: "json",
+      headers: { "Authorization": "Basic " + btoa(sessionStorage.getItem("token") + ":") }
+    })
+    .done(function(json, status, request) {
+      $(json).each(function(i) {
+        generateMeasurementTable("#tableMeasurements", json[i].id, json[i].measurementDate, json[i].height, json[i].waistline, json[i].weight, json[i].bodyMass, json[i].fatTotal, json[i].fatVisceral)
+      })
+      console.log(json);
+    })
+    .fail(function(err, request, status) {
+      logout();
+      console.log('error:', status, err);
+    })
+    .always(function() {
+      console.log("completed" );
+    });
+  }
+
+
+  function generateUserTable(target, username, firstName, lastName, gender, dateOfBirth, numberOfMeasurements, visibility) {
+    if (visibility === true){
+      var visibilityTxt = "Public";
+    } else {
+      var visibilityTxt = "Private";
+    }
+    $(target).append("<tr><th>Username</th><td>" + username + "</td></tr>");
+    $(target).append("<tr><th>Firstname</th><td>" + firstName + "</td></tr>");
+    $(target).append("<tr><th>Lastname</th><td>" + lastName + "</td></tr>");
+    $(target).append("<tr><th>Gender</th><td>" + gender + "</td></tr>");
+    $(target).append("<tr><th>Date of birth</th><td>" + dateOfBirth + "</td></tr>");
+    $(target).append("<tr><th>Number of measurements</th><td>" + numberOfMeasurements + "</td></tr>");
+    $(target).append("<tr><th>Visibility</th><td>" + visibilityTxt + "</td></tr>");
+  }
+
+  function generateMeasurementTable(target, id, measurementDate, height, waistline, weight, bodyMass, fatTotal, fatVisceral) {
+    $(target).append("<tr><th>Measurement id</th><td><a href=" + url + sessionStorage.getItem("userPath") + "/data/" + id + ">Id</a></td></tr>");
+    $(target).append("<tr><th>Measurement date</th><td>" + measurementDate + "</td></tr>");
+    if (height != null) { $(target).append("<tr><th>Height</th><td>" + height + "</td></tr>"); }
+    if (waistline != null) { $(target).append("<tr><th>Waistline</th><td>" + waistline + "</td></tr>"); }
+    if (weight != null) {$(target).append("<tr><th>Weight</th><td>" + weight + "</td></tr>"); }
+    if (bodyMass != null) {$(target).append("<tr><th>Bodymass %</th><td>" + bodyMass + "</td></tr>"); }
+    if (fatTotal != null) {$(target).append("<tr><th>Fat total %</th><td>" + fatTotal + "</td></tr>"); }
+    if (fatVisceral != null) {$(target).append("<tr><th>Fat visceral %</th><td>" + fatVisceral + "</td></tr>"); }
+  }
+
+  function login() {
+    isAuthenticated = true;
+    $("#divLogin").hide();
+    $("#logout").show();
+    $("#login").hide()
+    $("#createUser").hide()
+    $("#readUser").show();
+    $("#createMeasurement").show();
+    $("#readMeasurements").show();
+  }
+
+  function logout() {
+    isAuthenticated = false;
+    sessionStorage.clear();
+    $("#divReadUsers").hide();
+    $("#divReadUser").hide();
+    $(".loginRequired").hide();
+//    $("#divCreateMeasurement").hide();
+//    $("#divReadMeasurements").hide();
+//    $("#divReadMeasurement").hide();
+    $("#logout").hide();
+    $("#login").show();
+    $("#createUser").show();
+    $("#readUser").hide();
+    $("#createMeasurement").hide();
+    $("#readMeasurements").hide();
+  }
+});
+</script>
+</head>
+<body>
+
+<p id="login">Login</p>
+<p id="logout">Logout</p>
+<p id="readUsers">Browse users</p>
+<p id="createUser">New user</p>
+<p id="readUser">View user</p>
+<p id="createMeasurement">Add measurement</p>
+<p id="readMeasurements">View measurements</p>
+
+<div id="divLogin">
+  <form id="formLogin" method="get" action="">
+    <h3>Login:</h3>
+    Username:<br>
+    <input type="text" name="username" required><br>
+    Password:<br>
+    <input type="password" name="password" required><br><br>
+    <input type="submit" value="Submit">
+    <input type="reset">
+  </form>
+</div>
+
+<div id="divReadUsers">
+  <h3>Users:</h3>
+  <table id="tableUsers">
+  </table>
+</div>
+
+<div class="loginRequired" id="divReadUser">
+  <h3>User:</h3>
+  <table id="tableUser">
+  </table>
+</div>
+
+<div id="divCreateUser">
+  <h3>Create user:</h3>
+  <form id="formPostUser" method="post" action="">
+    Username:<br>
+    <input type="text" name="username" maxlength="20" required><br>
+    Password:<br>
+    <input type="password" name="password" maxlength="80" required><br>
+    Firstname:<br>
+    <input type="text" name="firstName" maxlength="80"><br>
+    Lastname:<br>
+    <input type="text" name="lastName" maxlength="80"><br>
+    Gender:<br>
+    <input type="radio" name="gender" value="male"> Male<br>
+    <input type="radio" name="gender" value="female"> Female<br>
+    <input type="radio" name="gender" value="" checked> Other<br>
+    Date of Birth:<br>
+    <input type="date" name="dateOfBirth"><br>
+    Visibility:<br>
+    <input type="radio" name="public" value="0" checked> Private<br>
+    <input type="radio" name="public" value="1"> Public<br><br>
+    <input type="submit" value="Submit">
+    <input type="reset">
+  </form>
+</div>
+
+<div class="loginRequired" id="divCreateMeasurement">
+  <h3>Create measurement:</h3>
+  <form id="formPostMeasurement" method="post" action="">
+    Date of measurement:<br>
+    <input type="date" name="measurementDate" required><br><br>
+    Height:<br>
+    <input type="number" name="height" max="300"><br><br>
+    Waistline:<br>
+    <input type="number" name="waistline" max="300"><br><br>
+    <fieldset>
+      Weight:<br>
+      <input type="number" name="weight" max="300"><br>
+      Body mass %:<br>
+      <input type="number" name="bodyMass" max="99"><br>
+      Total fat %:<br>
+      <input type="number" name="fatTotal" max="99"><br>
+      Visceral fat %:<br>
+      <input type="number" name="fatVisceral" max="99"><br>
+    </fieldset>
+    <br>
+    <input type="submit" value="Submit">
+    <input type="reset">
+  </form>
+</div>
+
+<div class="loginRequired" id="divReadMeasurements">
+  <h3>Measurements:</h3>
+  <table id="tableMeasurements">
+  </table>
+</div>
+
+<div class="loginRequired" id="divReadMeasurement">
+  <h3>Measurement:</h3>
+  <table id="tableMeasurement">
+  </table>
+</div>
+
+</body>
+</html>
