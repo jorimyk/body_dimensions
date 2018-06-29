@@ -1,6 +1,6 @@
 from flask import request, jsonify, make_response
 
-from bd_api import app, db, limiter, auth
+from bd_api import app, db, limiter, auth, CORS
 from . models import User, Role
 from bd_api import Config
 from bd_api.utils import CommonUtils, UserUtils
@@ -72,7 +72,7 @@ def users():
 @app.route('/users/<int:userId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>
 def user(userId):
     headers = request.headers
-    if not CommonUtils.userExists(userId):
+    if not UserUtils.userExists(userId):
         return jsonify(error='No user with id %s' % userId), 404
     elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
         return getUser(userId)
