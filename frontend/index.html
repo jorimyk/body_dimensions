@@ -184,7 +184,7 @@ $(document).ready(function() {
       .done(function(json, status, request) {
         console.log('getusers.done (Authenticated)')
         $(json).each(function(i) {
-          generateUserTable("#tableUsers", json[i].username, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements)
+          generateUserTable("#tableUsers", json[i].username, json[i].email, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements)
         })
         console.log(json);
       })
@@ -205,7 +205,7 @@ $(document).ready(function() {
         console.log('getusers.done (Unauthenticated)')
         console.log('json', json);
         $(json).each(function(i) {
-          generateUserTable("#tableUsers", json[i].username, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements, json[i].public)
+          generateUserTable("#tableUsers", json[i].username, json[i].email, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements, json[i].public)
         })
         console.log('json', json);
       })
@@ -227,7 +227,7 @@ $(document).ready(function() {
       headers: { "Authorization": "Basic " + btoa(sessionStorage.getItem("token") + ":") }
     })
     .done(function(json, status, request) {
-      generateUserTable("#tableUser", json.username, json.firstName, json.lastName, json.gender, json.dateOfBirth, json.numberOfMeasurements, json.public)
+      generateUserTable("#tableUser", json.username, json.email, json.firstName, json.lastName, json.gender, json.dateOfBirth, json.numberOfMeasurements, json.public)
       console.log(json);
     })
     .fail(function(err, request, status) {
@@ -301,13 +301,14 @@ $(document).ready(function() {
   }
 
 
-  function generateUserTable(target, username, firstName, lastName, gender, dateOfBirth, numberOfMeasurements, visibility) {
+  function generateUserTable(target, username, email, firstName, lastName, gender, dateOfBirth, numberOfMeasurements, visibility) {
     if (visibility === true){
       var visibilityTxt = "Public";
     } else {
       var visibilityTxt = "Private";
     }
     $(target).append("<tr><th>Username</th><td>" + username + "</td></tr>");
+    $(target).append("<tr><th>Email</th><td>" + email + "</td></tr>");
     $(target).append("<tr><th>Firstname</th><td>" + firstName + "</td></tr>");
     $(target).append("<tr><th>Lastname</th><td>" + lastName + "</td></tr>");
     $(target).append("<tr><th>Gender</th><td>" + gender + "</td></tr>");
@@ -398,6 +399,8 @@ $(document).ready(function() {
     <input type="text" name="username" maxlength="20" required><br>
     Password:<br>
     <input type="password" name="password" maxlength="80" required><br>
+    Email:<br>
+    <input type="email" name="email" maxlength="120" required><br>
     Firstname:<br>
     <input type="text" name="firstName" maxlength="80"><br>
     Lastname:<br>
