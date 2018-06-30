@@ -184,7 +184,7 @@ $(document).ready(function() {
       .done(function(json, status, request) {
         console.log('getusers.done (Authenticated)')
         $(json).each(function(i) {
-          generateUserTable("#tableUsers", json[i].username, json[i].email, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements)
+          generateUserTable("#tableUsers", json[i].username, json[i].email, json[i].firstName, json[i].lastName, json[i].gender, json[i].dateOfBirth, json[i].numberOfMeasurements, json[i].public)
         })
         console.log(json);
       })
