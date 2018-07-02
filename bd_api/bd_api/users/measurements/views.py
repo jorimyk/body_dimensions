@@ -2,13 +2,14 @@ from flask import request, jsonify, make_response
 
 from bd_api import app, db, limiter, auth
 from . models import Measurement
+from bd_api.users.models import Role
 from bd_api import Config
 from bd_api.utils import CommonUtils, UserUtils, MeasurementUtils
 from bd_api.auth import Authenticate, Password, Token
 
 
 @app.route('/users/<int:userId>/data', methods = ['POST', 'GET', 'DELETE']) # /users/<user>/data
-@limiter.limit("100/day")
+# @limiter.limit("100/day")
 def measurements(userId):
     headers = request.headers
     if not UserUtils.userExists(userId):
