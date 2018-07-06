@@ -129,38 +129,42 @@ def postMeasurements(token, location):
     (\d{1,2})   # month number 1 to 2 digits
     .           # date separator
     (\d{2,4})   # year 2 to 4 digits
-    \s+         # any number of white-spaces
+    \D+         # any number of non-digits
     (\d+.\d+)   # weight any number of digits
-    \s+         # any number of white-spaces
+    \D+         #  any number of non-digits
     (\d+.\d+)   # fatTotal any number of digits
-    \s+         # any number of white-spaces
+    \D+         # any number of non-digits
     (\d+.\d+)   # bodyMass any number of digits
-    \s*         # optional white-spaces
+    \D*         # any number of non-digits, optional
     (\d*)       # fatVisceral any number of digits, optional
-    \s*         # optional white-spaces
-    (\d*.\d*)   # waistline any number of digits, optional
-    \s*         # optional white-spaces
+    \D*         # any number of non-digits, optional
+    (\d*.\d*)?  # waistline as floating point number, optional
+    \D*         # any number of non-digits, optional
     $           # end of string
     ''', re.VERBOSE)
     try:
         with open(measurementFile) as inputData:
             counter = 0;
             for line in inputData:
+#                print('Round %s' % counter)
                 output = pattern.search(line).groups()
                 weight = float(output[3])
                 fatTotal = float(output[4])
                 bodyMass = float(output[5])
+#                print('%s.%s.%s fatVisceral: %s, waistline: %s' % (output[0], output[1], output[2], output[6], output[7]))
                 if output[6]:
+#                    print('fatVisceral löytyy')
                     fatVisceral = int(output[6])
                 else:
+#                    print('fatVisceral ei löydy')
                     fatVisceral = None
-                if output[7] == ' ':
-                    waistline = None
-                else:
+                if output[7]:
                     try:
                         waistline = int(output[7])
                     except ValueError:
                         waistline = float(output[7])
+                else:
+                    waistline = None
                 if len(output[2]) == 2:
                     measurementDate = datetime.datetime.strptime('%s.%s.%s' % (output[0], output[1], output[2]), '%d.%m.%y').date()
                 elif len(output[2]) == 4:
