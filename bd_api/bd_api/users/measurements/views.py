@@ -118,7 +118,7 @@ def deleteAllMeasurements(userId, internalCall):
     if internalCall:
         return len(data)
     else:
-        return jsonify(result='measurement(s) deleted', numberOfMeasurementsDeleted='%s' % len(data), userId=userId, username=getUsername(userId))
+        return jsonify(result='measurement(s) deleted', numberOfMeasurementsDeleted='%s' % len(data), userId=userId, username=CommonUtils.getUsername(userId))
 
 
 def getMeasurementItem(userId, dataId):
