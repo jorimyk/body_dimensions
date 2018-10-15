@@ -3,6 +3,7 @@ from flask import request, jsonify, make_response
 from bd_api import app, db, limiter, auth, CORS
 from . models import User, Role
 from bd_api import Config
+from .measurements.views import deleteAllMeasurements
 from bd_api.utils import CommonUtils, UserUtils
 from bd_api.auth import Authenticate, Password, Token
 
