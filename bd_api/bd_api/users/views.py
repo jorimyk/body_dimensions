@@ -119,6 +119,7 @@ def addNewUser(d):
             db.session.commit()
             user = user.serialize
             user['token'] = Token.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
+            user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
             response = jsonify(user)
             response.status_code = 201
             response.headers['Content-Location'] = '/users/' + str(user['id'])
