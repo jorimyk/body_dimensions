@@ -160,7 +160,7 @@ def updateMeasurementItem(userId, dataId, d):
                     data['measurementDate'] = CommonUtils.convertToISODate(data['measurementDate'])
                     data['timestamp'] = CommonUtils.convertToISODate(data['timestamp'])
                     response = jsonify(data)
-                    response.status_code = 201
+                    response.status_code = 200
                     response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data['id'])
                     response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
                     return response

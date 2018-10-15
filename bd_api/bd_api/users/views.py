@@ -203,7 +203,7 @@ def updateUser(userId, d):
                 db.session.commit()
                 user = user.serialize
                 user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
-                return jsonify(user), 201
+                return jsonify(user), 200
             else:
                 return jsonify(UserUtils.validate_user_values(d)), 400
         else:
