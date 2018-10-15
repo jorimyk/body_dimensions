@@ -179,4 +179,4 @@ def deleteMeasurementItem(userId, dataId):
     data = Measurement.query.filter_by(user_id = userId).filter_by(id = dataId).first()
     db.session.delete(data)
     db.session.commit()
-    return jsonify(result='measurement removed', userId=userId, username=getUsername(userId), dataId=dataId)
+    return jsonify(result='measurement removed', userId=userId, username=CommonUtils.getUsername(userId), dataId=dataId)
