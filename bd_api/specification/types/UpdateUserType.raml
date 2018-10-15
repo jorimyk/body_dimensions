@@ -1,0 +1,30 @@
+#%RAML 1.0 DataType
+
+type: object
+properties: 
+  username:
+    type: string
+    required: false
+  password:
+    type: string
+    required: false
+  email:
+    type: string
+    required: false
+  firstName:
+    type: string
+    required: false
+  lastName:
+    type: string
+    required: false
+  dateOfBirth:
+    type: string
+    required: false
+  gender:
+    enum:
+    - male
+    - female
+    required: false
+  public:
+    type: boolean
+    required: false

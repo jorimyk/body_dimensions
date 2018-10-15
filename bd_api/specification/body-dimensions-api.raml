@@ -1,0 +1,114 @@
+#%RAML 1.0
+title: Body dimensions API
+
+types: 
+  CreateUser: !include types/CreateUserType.raml
+  User: !include types/UserType.raml
+  DeleteUsers: !include types/DeleteUsersType.raml
+  UpdateUser: !include types/UpdateUserType.raml
+  DeleteUser: !include types/DeleteUserType.raml
+  CreateMeasurement: !include types/CreateMeasurementType.raml
+  ReadMeasurement: !include types/ReadMeasurementType.raml
+  DeleteMeasuments: !include types/DeleteMeasurementsType.raml
+  UpdateMeasurement: !include types/UpdateMeasurementDataType.raml
+  DeleteMeasurement: !include types/DeleteMeasurementType.raml
+
+/users:
+  post:
+    description: Create a new user
+    body: 
+      application/json:
+        type: CreateUser
+    responses: 
+      201:
+        body: 
+          application/json:
+            type: User
+  get:
+    description: Read all users
+    responses: 
+      200:
+        body: 
+          application/json:
+            type: User[]
+  delete:
+    description: Delete all users
+    responses: 
+      200:
+        body: 
+          application/json:
+            type: DeleteUsers
+  /{userId}:
+    get:
+      responses: 
+        200:
+          body: 
+            application/json:
+              type: User
+    put:
+      description: Update an existing users
+      body: 
+        application/json:
+          type: UpdateUser
+      responses: 
+        200:
+          body: 
+            application/json:
+              type: User
+    delete:
+      description: Delete existing user
+      responses: 
+        200:
+          body:
+            application/json:
+              type: DeleteUser
+    /data:
+      post:
+        description: Create a new measurement item for user
+        body: 
+          application/json:
+            type: CreateMeasurement
+        responses:
+          201:
+            body: 
+              application/json:
+                type: ReadMeasurement
+      get:
+        description: Read user's measurement items
+        responses: 
+           200:
+            body:
+              application/json:
+                type: ReadMeasurement[]
+      delete:
+        description: Delete all user's measurements
+        responses: 
+          200:
+            body: 
+              application/json:
+                type: DeleteMeasuments
+      /{data_id}:
+        get:
+          description: Read a measurement item
+          responses: 
+            200:
+              body: 
+                application/json:
+                  type: ReadMeasurement
+        put:
+          description: Update a measurement item
+          body:
+            application/json:
+              type: UpdateMeasurement
+          responses: 
+            200:
+              body: 
+                application/json:
+                  type: User
+        delete:
+          description: Delete a measurement item
+          responses:
+            200:
+              body:
+                application/json:
+                  type: DeleteMeasurement
