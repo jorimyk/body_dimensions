@@ -2,91 +2,103 @@
 title: Body dimensions API
 
 types: 
-  CreateUser: !include types/CreateUserType.raml
-  User: !include types/UserType.raml
-  DeleteUsers: !include types/DeleteUsersType.raml
-  UpdateUser: !include types/UpdateUserType.raml
-  DeleteUser: !include types/DeleteUserType.raml
-  CreateMeasurement: !include types/CreateMeasurementType.raml
-  ReadMeasurement: !include types/ReadMeasurementType.raml
-  DeleteMeasuments: !include types/DeleteMeasurementsType.raml
-  UpdateMeasurement: !include types/UpdateMeasurementDataType.raml
-  DeleteMeasurement: !include types/DeleteMeasurementType.raml
+  CreateUserType: !include types/CreateUserType.raml
+  UserType: !include types/UserType.raml
+  UserWithTokenType: !include types/UserWithTokenType.raml
+  DeleteUsersType: !include types/DeleteUsersType.raml
+  UpdateUserType: !include types/UpdateUserType.raml
+  DeleteUserType: !include types/DeleteUserType.raml
+  CreateMeasurementType: !include types/CreateMeasurementType.raml
+  MeasurementType: !include types/MeasurementType.raml
+  DeleteMeasumentsType: !include types/DeleteMeasurementsType.raml
+  UpdateMeasurementType: !include types/UpdateMeasurementDataType.raml
+  DeleteMeasurementType: !include types/DeleteMeasurementType.raml
 
 /users:
   post:
     description: Create a new user
     body: 
       application/json:
-        type: CreateUser
+        type: CreateUserType
+        example: !include examples/CreateUpdateUserExample.raml
     responses: 
       201:
         body: 
           application/json:
-            type: User
+            type: UserWithTokenType
+            example: !include examples/UserWithTokenExample.raml
   get:
     description: Read all users
     responses: 
       200:
         body: 
           application/json:
-            type: User[]
+            type: UserType[]
+            example: !include examples/UsersExample.raml
   delete:
     description: Delete all users
     responses: 
       200:
         body: 
           application/json:
-            type: DeleteUsers
+            type: DeleteUsersType
+            example: !include examples/DeleteUsersExample.raml
   /{userId}:
     get:
       responses: 
         200:
           body: 
             application/json:
-              type: User
+              type: UserType
+              example: !include examples/UserExample.raml
     put:
       description: Update an existing users
       body: 
         application/json:
-          type: UpdateUser
+          type: UpdateUserType
+          example: !include examples/CreateUpdateUserExample.raml
       responses: 
         200:
           body: 
             application/json:
-              type: User
+              type: UserType
+              example: !include examples/UserExample.raml
     delete:
       description: Delete existing user
       responses: 
         200:
           body:
             application/json:
-              type: DeleteUser
+              type: DeleteUserType
+              example: !include examples/DeleteUserExample.raml
     /data:
       post:
         description: Create a new measurement item for user
         body: 
           application/json:
-            type: CreateMeasurement
+            type: CreateMeasurementType
         responses:
           201:
             body: 
               application/json:
-                type: ReadMeasurement
+                type: MeasurementType
+                example: !include examples/MeasurementExample.raml
       get:
         description: Read user's measurement items
         responses: 
            200:
             body:
               application/json:
-                type: ReadMeasurement[]
+                type: MeasurementType[]
+                example: !include examples/MeasurementsExample.raml
       delete:
         description: Delete all user's measurements
         responses: 
           200:
             body: 
               application/json:
-                type: DeleteMeasuments
+                type: DeleteMeasumentsType
+                example: !include examples/DeleteMeasurementsExample.raml
       /{data_id}:
         get:
           description: Read a measurement item
@@ -94,21 +106,24 @@ types:
             200:
               body: 
                 application/json:
-                  type: ReadMeasurement
+                  type: MeasurementType
         put:
           description: Update a measurement item
           body:
             application/json:
-              type: UpdateMeasurement
+              type: UpdateMeasurementType
+              example: !include examples/UpdateMeasurementExample.raml
           responses: 
             200:
               body: 
                 application/json:
-                  type: User
+                  type: MeasurementType
+                  example: !include examples/MeasurementExample.raml
         delete:
           description: Delete a measurement item
           responses:
             200:
               body:
                 application/json:
-                  type: DeleteMeasurement
+                  type: DeleteMeasurementType
+                  example: !include examples/DeleteMeasurementExample.raml
