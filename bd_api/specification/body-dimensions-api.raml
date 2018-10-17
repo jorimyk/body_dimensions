@@ -1,7 +1,62 @@
 #%RAML 1.0
 title: Body dimensions API
 
-types: 
+traits: 
+  has200TokenResponse:
+    responses: 
+      200:
+        headers: 
+          Content-Location:
+            description: Location of user for which correct username/password pair belongs to
+            type: string
+            example: /users/2
+          Access-Control-Expose-Headers:
+            description: The Access-Control-Expose-Headers response header indicates which headers can be exposed as part of the response by listing their names.
+            type: string
+            example: Content-Location
+        body:
+          application/json:
+            properties: 
+              token:
+                type: string
+                example: eyJhbGciOiJIUzI1NiIsImlhdCI6MTUzOTc4MjQ4MSwiZXhwIjoxNTM5NzgzMDgxfQ.eyJpZCI6MiwidXNlcm5hbWUiOiJ0ZXN0MDEiLCJyb2xlIjoxfQ.YYg4bDU9BynEXi-5-has-lTsOBYeDL1HM833DLWHsMQ
+
+/login:
+  post:
+    description: Get access token by posting correct username/password pair in authentication header or in 'username' and 'password' named form elemements
+    is:  [has200TokenResponse]
+    headers: 
+      Authorization:
+        properties: 
+          username:
+            type: string
+            required: false
+          password:
+            type: string
+            required: false
+    body:
+      multipart/form-data:
+        properties: 
+          username:
+            type: string
+            required: false
+          password:
+            type: string
+            required: false
+  get:
+    description: Get access token by posting correct username/password pair in authentication header
+    is:  [has200TokenResponse]
+    headers: 
+      Authorization:
+        properties: 
+          username:
+            type: string
+            required: true
+          password:
+            type: string
+            required: true
+
+types:  
   CreateUserType: !include types/CreateUserType.raml
   UserType: !include types/UserType.raml
   UserWithTokenType: !include types/UserWithTokenType.raml
@@ -16,7 +71,7 @@ types:
 
 /users:
   post:
-    description: Create a new user
+    description: Create a new user and generates access token
     body: 
       application/json:
         type: CreateUserType
