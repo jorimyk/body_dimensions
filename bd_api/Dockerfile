@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.6.3
+FROM python:3.7.1
 
 # Copy the current directory contents into the container at /opt/app
 COPY . /opt/app
@@ -10,6 +10,9 @@ WORKDIR /opt/app
 # Define environment variable
 ENV FLASK_DEBUG=1
 ENV FLASK_APP=bd_api
+
+# Upgrade pip
+RUN pip install --upgrade pip
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --trusted-host pypi.python.org -r /opt/app/requirements.txt
