@@ -8,7 +8,7 @@ COPY . /opt/app
 WORKDIR /opt/app
 
 # Define environment variable
-ENV FLASK_DEBUG=1
+ENV FLASK_ENV='development'
 ENV FLASK_APP=bd_api
 
 # Upgrade pip
