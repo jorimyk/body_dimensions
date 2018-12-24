@@ -4,7 +4,6 @@ from datetime import datetime
 
 class Measurement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     measurementDate = db.Column(db.Date, nullable = False)
     height = db.Column(db.Float, nullable = True)
@@ -13,6 +12,7 @@ class Measurement(db.Model):
     bodyMass = db.Column(db.Float, nullable = True)
     fatVisceral = db.Column(db.Integer, nullable = True)
     waistline = db.Column(db.Float, nullable = True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     @property
     def serialize(self):
