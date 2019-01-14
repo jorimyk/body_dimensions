@@ -131,7 +131,7 @@ def getAllUsers(user):
     if q:
         q = [i.serialize for i in q]
         for index in q:
-            index['numberOfMeasurements'] = CommonUtils.countNumberOfRows(index['id'])
+            index['measurements'] = CommonUtils.countNumberOfRows(index['id'])
             index['dateOfBirth'] = CommonUtils.convertToISODate(index['dateOfBirth'])
         return jsonify(q)
     else:
