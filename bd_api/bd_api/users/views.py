@@ -4,9 +4,8 @@ from bd_api import app, db, limiter, auth, CORS
 from . models import User, Role
 from bd_api.users.measurements.models import Measurement
 from bd_api import Config
-#from .measurements.views import deleteAllMeasurements
 from bd_api.utils import CommonUtils, UserUtils
-from bd_api.auth import Authenticate, Password, Token
+from bd_api.auth import Password, Token
 
 
 # Creeate admin account if no users in database
@@ -25,10 +24,11 @@ def login():
     else:
         return jsonify(error='username/password required'), 400
 
-    if UserUtils.getUserIdAndRole(auth.get('username')) and  Password.verifyPassword(auth.get('username'), auth.get('password')):
-        userId, role = UserUtils.getUserIdAndRole(auth.get('username'))
-        response = jsonify({'token': Token.generateToken(userId, auth.get('username'), role, Config.expiration).decode('ascii')})
-        response.headers['Content-Location'] = '/users/%s' % str(userId)
+    q = User.query.filter_by(username=auth.get('username')).first()
+
+    if q and Password.verifyPassword(auth.get('username'), auth.get('password')):
+        response = jsonify({'token': Token.generateToken(q.id, q.username, q.role, Config.expiration).decode('ascii')})
+        response.headers['Content-Location'] = '/users/%s' % str(q.id)
         response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
         return response
     else:
