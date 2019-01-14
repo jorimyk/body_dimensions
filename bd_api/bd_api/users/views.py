@@ -82,14 +82,9 @@ def user(userId):
         d = request.get_json(silent=True)
         return updateUser(headers, userId, user, d)
     # Delete user and all measurements for user if owner or admin
-    elif request.method == 'DELETE' and user[0] == userId or user[1] == Role.ADMIN:
+    elif request.method == 'DELETE':
         return deleteUser(userId, user)
-    # User not authenticated
-    elif not user[0]:
-        return jsonify(error='Authentication required'), 401
-    # User is not authorized for resource
-    elif user[0] != userId:
-        return jsonify(error='Unauthorized'), 403
+    # Return 405 if method not GET, PUT or DELETE
     else:
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
@@ -215,10 +210,12 @@ def deleteUser(userId, user):
     """Delete user from database based on userId"""
     q = User.query.filter_by(id = userId).first()
 
-    if q:
+    if not q:
+        return jsonify(error='User not found', userId=userId), 404
+    elif user[0] != userId and user[1] != Role.ADMIN:
+        return jsonify(error='Unauthorized'), 403
+    else:
         measurements_deleted = Measurement.query.filter_by(owner_id = userId).delete()
         db.session.delete(q)
         db.session.commit()
-        return jsonify(result='user removed', userId=userId, username=user[2], numberOfMeasurementsDeleted=measurements_deleted)
-    else:
-        return jsonify(error='User not found', userId=userId), 404
+        return jsonify(result='user removed', userId=userId, username=user[2], MeasurementsDeleted=measurements_deleted)
