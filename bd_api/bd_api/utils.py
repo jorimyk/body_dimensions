@@ -8,15 +8,6 @@ from bd_api.users.measurements.models import Measurement
 
 class CommonUtils:
 
-#    def getUsername(userId):
-#        """Return username linked to user Id"""
-#        q = User.query.add_columns('username').filter_by(id = userId).first()
-#        if q:
-#            return q[1]
-#        else:
-#            return {'error': 'not found', 'userId': userId}
-
-
     def convertFromISODate(date):
         """Convert long ISO date to short if exists, else return None"""
         if date:
@@ -78,25 +69,12 @@ class UserUtils:
         return user_validation
 
 
-    def getUserIdAndRole(username):
-        """Return user Id linked to username"""
-        q = User.query.add_columns('id').add_columns('role').filter_by(username=username).first()
-        if q:
-            return q[1], q[2]
-        else:
-            return False
-
-
     def checkIfPublicUser(userId):
         """Return None if user with userId is not public"""
         return User.query.filter_by(public = True).filter_by(id = userId).first()
 
 
 class MeasurementUtils:
-
-#    def measurement_exists(userId, dataId):
-#        return Measurement.query.filter_by(id = dataId).filter_by(owner_id = userId).first()
-
 
     def validate_measurement_values(userId, measurement_request):
         measurement_validation = {}
