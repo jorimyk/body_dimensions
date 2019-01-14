@@ -1,5 +1,7 @@
 from bd_api import db
 
+from datetime import datetime
+
 class Role:
     ADMIN = 0
     USER = 1
@@ -15,6 +17,7 @@ class User(db.Model):
     username = db.Column(db.String(20), unique=True, nullable=False)
     password = db.Column(db.String(80), nullable = False)
     public = db.Column(db.Boolean, nullable = False)
+    dateJoined = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     measurements = db.relationship('Measurement', backref='owner', lazy=True)
 
 
@@ -29,7 +32,8 @@ class User(db.Model):
             'firstName': self.firstName,
             'lastName' : self.lastName,
             'gender' : self.gender,
-            'dateOfBirth' : self.dateOfBirth
+            'dateOfBirth' : self.dateOfBirth,
+            'dateJoined' : self.dateJoined
         }
 
 
