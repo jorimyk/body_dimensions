@@ -51,11 +51,11 @@ def users():
     if request.method == 'POST':
         d = request.get_json(silent=True)
         return addNewUser(headers, d)
-    # Read users that user is authorized to see
+    # Read users
     elif request.method == 'GET':
         return getAllUsers(user)
-    # Delete all users if role is admin, else return 403
-    elif request.method == 'DELETE':# Delete all users
+    # Delete all users
+    elif request.method == 'DELETE':
         return deleteUsers(user)
     # Return 405 if method not POST, GET or DELETE
     else:
