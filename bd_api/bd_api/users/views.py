@@ -218,4 +218,4 @@ def deleteUser(userId, user):
         measurements_deleted = Measurement.query.filter_by(owner_id = userId).delete()
         db.session.delete(q)
         db.session.commit()
-        return jsonify(result='user removed', userId=userId, username=user[2], MeasurementsDeleted=measurements_deleted)
+        return jsonify(result='user removed', userId=userId, username=user[2], measurementsDeleted=measurements_deleted)
