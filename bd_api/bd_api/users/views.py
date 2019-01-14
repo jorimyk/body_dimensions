@@ -78,11 +78,9 @@ def user(userId):
     if request.method == 'GET':
         return getUser(userId, user)
     # Update user if owner or admin
-    elif request.method == 'PUT' and 'Content-Type' in headers and 'application/json' in headers.get('Content-Type') and (user[0] == userId or user[1] == Role.ADMIN):
+    elif request.method == 'PUT':
         d = request.get_json(silent=True)
-        return updateUser(userId, d)
-    elif request.method == 'PUT' and (user[0] == userId or user[1] == Role.ADMIN):
-        return jsonify(error='Content Type must be application/json'), 400
+        return updateUser(headers, userId, user, d)
     # Delete user and all measurements for user if owner or admin
     elif request.method == 'DELETE' and user[0] == userId or user[1] == Role.ADMIN:
         return deleteUser(userId, user)
@@ -108,7 +106,7 @@ def addNewUser(headers, d):
     elif UserUtils.validate_user_values(d):
         return jsonify(UserUtils.validate_user_values(d)), 400
     else:
-        user = User( \
+        q = User( \
         firstName = d.get('firstName'), \
         lastName = d.get('lastName'), \
         email = d.get('email'), \
@@ -117,9 +115,9 @@ def addNewUser(headers, d):
         username = d.get('username'), \
         password = Password.hashPassword(d.get('password')), \
         public = d.get('public'))
-        db.session.add(user)
+        db.session.add(q)
         db.session.commit()
-        user = user.serialize
+        user = q.serialize
         user['token'] = Token.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
         user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
         response = jsonify(user)
@@ -167,48 +165,50 @@ def getUser(userId, user):
         return jsonify(error='Authentication required'), 401
     elif user[0] != userId and user[1] != Role.ADMIN and not q.public:
         return jsonify(error='Unauthorized'), 403
-#    elif user[0] == userId or user[1] == Role.ADMIN or q.public:
     else:
         q = q.serialize
-        q['numberOfMeasurements'] = CommonUtils.countNumberOfRows(userId)
+        q['measurements'] = CommonUtils.countNumberOfRows(userId)
         q['dateOfBirth'] = CommonUtils.convertToISODate(q['dateOfBirth'])
         return jsonify(q)
 
 
-def updateUser(userId, d):
+def updateUser(headers, userId, user, d):
     """Update user details if valid keys/values in d"""
-    errorResponse = {'firstName': 'string/null (if key exists)', 'lastName': 'string/null (if key exists)', 'gender': '(male/female/null) (if key exists)', 'dateOfBirth': 'string YYYY-MM-DD/null (if key exists)', 'username': 'string (if key exists)', 'password': 'string (if key exists)', 'public': 'boolean/null (if key exists'}
-    if d:
-        if any(key in d for key in User.user_keys):
-            if not UserUtils.validate_user_values(d):
-                user = User.query.filter_by(id = userId).first()
-                if d.get('firstName'):
-                    user.firstName = d.get('firstName')
-                if d.get('lastName'):
-                    user.lastName = d.get('lastName')
-                if d.get('gender'):
-                    user.gender = d.get('gender')
-                if d.get('dateOfBirth'):
-                    user.dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth'))
-                if d.get('username'):
-                    user.username = d.get('username')
-                if d.get('password'):
-                    user.password = Password.hashPassword(d.get('password'))
-                if d.get('public'):
-                    user.public = d.get('public')
-                db.session.add(user)
-                db.session.commit()
-                user = user.serialize
-                user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
-                return jsonify(user), 200
-            else:
-                return jsonify(UserUtils.validate_user_values(d)), 400
-        else:
-            errorResponse['error'] = 'No valid keys'
-            return jsonify(errorResponse), 400
-    else:
-        errorResponse['error'] = 'no valid JSON in request'
-        return jsonify(errorResponse), 400
+    q = User.query.filter_by(id = userId).first()
+
+    if not q:
+        return jsonify(error='User not found', userId=userId), 404
+    if user[0] != userId and user[1] != Role.ADMIN:
+        return jsonify(error='Unauthorized'), 403
+    if not 'Content-Type' in headers or not 'application/json' in headers.get('Content-Type'):
+        return jsonify(error='Content Type must be application/json'), 400
+    if not d:
+        return jsonify(error='no JSON in request'), 400
+    if not any(key in d for key in User.user_keys):
+        return jsonify(error='No valid keys'), 400
+    if UserUtils.validate_user_values(d):
+        return jsonify(UserUtils.validate_user_values(d)), 400
+
+    if d.get('firstName'):
+        q.firstName = d.get('firstName')
+    if d.get('lastName'):
+        q.lastName = d.get('lastName')
+    if d.get('gender'):
+        q.gender = d.get('gender')
+    if d.get('dateOfBirth'):
+        q.dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth'))
+    if d.get('username'):
+        q.username = d.get('username')
+    if d.get('password'):
+        q.password = Password.hashPassword(d.get('password'))
+    if d.get('public'):
+        q.public = d.get('public')
+
+    db.session.add(q)
+    db.session.commit()
+    user = q.serialize
+    user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
+    return jsonify(user), 200
 
 
 def deleteUser(userId, user):
