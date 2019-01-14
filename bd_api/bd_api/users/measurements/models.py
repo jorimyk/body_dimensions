@@ -12,13 +12,14 @@ class Measurement(db.Model):
     bodyMass = db.Column(db.Float, nullable = True)
     fatVisceral = db.Column(db.Integer, nullable = True)
     waistline = db.Column(db.Float, nullable = True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
 
     @property
     def serialize(self):
         return {
             'id': self.id,
-            'user_id': self.user_id,
+            'owner_id': self.owner_id,
             'timestamp': self.timestamp,
             'measurementDate': self.measurementDate,
             'height' : self.height,

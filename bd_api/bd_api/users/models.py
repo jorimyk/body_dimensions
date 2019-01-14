@@ -14,7 +14,8 @@ class User(db.Model):
     dateOfBirth = db.Column(db.Date, nullable=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
     password = db.Column(db.String(80), nullable = False)
-    public = db.Column(db.Boolean, nullable = True)
+    public = db.Column(db.Boolean, nullable = False)
+    measurements = db.relationship('Measurement', backref='owner', lazy=True)
 
 
     @property

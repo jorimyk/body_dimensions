@@ -8,13 +8,13 @@ from bd_api.users.measurements.models import Measurement
 
 class CommonUtils:
 
-    def getUsername(userId):
-        """Return username linked to user Id"""
-        q = User.query.add_columns('username').filter_by(id = userId).first()
-        if q:
-            return q[1]
-        else:
-            return {'error': 'not found', 'userId': userId}
+#    def getUsername(userId):
+#        """Return username linked to user Id"""
+#        q = User.query.add_columns('username').filter_by(id = userId).first()
+#        if q:
+#            return q[1]
+#        else:
+#            return {'error': 'not found', 'userId': userId}
 
 
     def convertFromISODate(date):
@@ -38,7 +38,7 @@ class CommonUtils:
 
 
     def countNumberOfRows(userId):
-        numberOfMeasurements = Measurement.query.filter_by(user_id=userId).count()
+        numberOfMeasurements = Measurement.query.filter_by(owner_id=userId).count()
         return(numberOfMeasurements)
 
 
@@ -78,10 +78,6 @@ class UserUtils:
         return user_validation
 
 
-    def userExists(userId):
-        return User.query.filter_by(id = userId).first()
-
-
     def getUserIdAndRole(username):
         """Return user Id linked to username"""
         q = User.query.add_columns('id').add_columns('role').filter_by(username=username).first()
@@ -98,8 +94,8 @@ class UserUtils:
 
 class MeasurementUtils:
 
-    def measurement_exists(userId, dataId):
-        return Measurement.query.filter_by(id = dataId).filter_by(user_id = userId).first()
+#    def measurement_exists(userId, dataId):
+#        return Measurement.query.filter_by(id = dataId).filter_by(owner_id = userId).first()
 
 
     def validate_measurement_values(userId, measurement_request):
@@ -181,7 +177,7 @@ def validateDate(userId, key, date):
             return {'error': 'invalid value: %s, valid value date in ISO 8601 format' % date}
 
     if userId:
-        q = Measurement.query.add_columns('id').filter_by(user_id = userId).filter_by(measurementDate = date).first()
+        q = Measurement.query.add_columns('id').filter_by(owner_id = userId).filter_by(measurementDate = date).first()
         if q:
             return {'error': 'duplicate value found for date %s (data id %s)' % (date, q[1])}
         else:

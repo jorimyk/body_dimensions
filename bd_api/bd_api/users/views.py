@@ -2,15 +2,16 @@ from flask import request, jsonify, make_response
 
 from bd_api import app, db, limiter, auth, CORS
 from . models import User, Role
+from bd_api.users.measurements.models import Measurement
 from bd_api import Config
-from .measurements.views import deleteAllMeasurements
+#from .measurements.views import deleteAllMeasurements
 from bd_api.utils import CommonUtils, UserUtils
 from bd_api.auth import Authenticate, Password, Token
 
 
 # Creeate admin account if no users in database
 if not User.query.all():
-    admin = User(username='admin', email=Config.admin_email , password=Password.hashPassword(Config.admin_password), role=Role.ADMIN)
+    admin = User(username='admin', email=Config.admin_email , password=Password.hashPassword(Config.admin_password), role=Role.ADMIN, public=False)
     db.session.add(admin)
     db.session.commit()
 
@@ -23,49 +24,44 @@ def login():
         auth = {'username': request.form['username'], 'password': request.form['password']}
     else:
         return jsonify(error='username/password required'), 400
-    if UserUtils.getUserIdAndRole(auth.get('username')):
-        if Password.verifyPassword(auth.get('username'), auth.get('password')):
-            userId, role = UserUtils.getUserIdAndRole(auth.get('username'))
-            response = jsonify({'token': Token.generateToken(userId, auth.get('username'), role, Config.expiration).decode('ascii')})
-            response.headers['Content-Location'] = '/users/%s' % str(userId)
-            response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
-            return response
-        else:
-            return jsonify(error='Invalid username/password'), 401
+
+    if UserUtils.getUserIdAndRole(auth.get('username')) and  Password.verifyPassword(auth.get('username'), auth.get('password')):
+        userId, role = UserUtils.getUserIdAndRole(auth.get('username'))
+        response = jsonify({'token': Token.generateToken(userId, auth.get('username'), role, Config.expiration).decode('ascii')})
+        response.headers['Content-Location'] = '/users/%s' % str(userId)
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
+        return response
     else:
-        return  jsonify(error='user %s not found' % auth.get('username')), 400
+        return jsonify(error='Invalid username/password'), 401
 
 
 @app.route('/users', methods = ['POST', 'GET', 'PUT', 'DELETE']) # /users
 def users():
     headers = request.headers
-    if request.authorization:
-        auth = request.authorization
-        if isinstance(Authenticate.authenticate(auth), dict):
-            return jsonify(Authenticate.authenticate(auth)), 401
-        else:
-            userId, role, username = Authenticate.authenticate(auth)
+    auth = request.authorization
+
+    if not auth:
+        user = (None, Role.USER, None)
+    elif 'error' in Token.verifyToken(auth.get('username')):
+        return jsonify(Token.verifyToken(auth.get('username'))), 401
     else:
-        role = Role.USER
-        userId = None
-    if request.method == 'POST': # Add a new user
-        if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
-            d = request.get_json(silent=True)
-            return addNewUser(d)
-        else:
-            return jsonify(error='Content Type must be application/json'), 400
-    elif request.method == 'GET': # List all users
-        if role == Role.ADMIN:
-            return getAllUsers()
-        else:
-            return getAllPublicUsers(userId)
-#    elif request.method == 'PUT': # Bulk update users
-#        return jsonify(error='Bulk update users not implemented'), 501
-    elif request.method == 'DELETE': # Delete all users
-        if role == Role.ADMIN:
-            return deleteUsers()
-        else:
-            return jsonify(error='Insufficient privileges'), 403
+        user = Token.verifyToken(auth.get('username'))
+
+    # Add a new user if Content-Type == application/json, else return 400
+    if request.method == 'POST' and 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
+        d = request.get_json(silent=True)
+        return addNewUser(d)
+    elif request.method == 'POST':
+        return jsonify(error='Content Type must be application/json'), 400
+    # Read users that user is authorized to see
+    elif request.method == 'GET':
+        return getAllUsers(user)
+    # Delete all users if role is admin, else return 403
+    elif request.method == 'DELETE' and user[1] == Role.ADMIN:# Delete all users
+        return deleteUsers()
+    elif request.method == 'DELETE':
+        return jsonify(error='Unauthorized'), 403
+    # Return 405 if method not POST, GET or DELETE
     else:
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
@@ -73,31 +69,35 @@ def users():
 @app.route('/users/<int:userId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>
 def user(userId):
     headers = request.headers
-    if not UserUtils.userExists(userId):
-        return jsonify(error='No user with id %s' % userId), 404
-    elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
-        return getUser(userId)
-    elif request.authorization:
-        auth = request.authorization
-        if isinstance(Authenticate.authenticate(auth), dict):
-            return jsonify(Authenticate.authenticate(auth)), 401
-        elif Authenticate.authenticate(auth)[0] == userId or Authenticate.authenticate(auth)[1] == Role.ADMIN:
-            if request.method == 'GET': # Show user with userId
-                return getUser(userId)
-            elif request.method == 'PUT': # Update user
-                if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
-                    d = request.get_json(silent=True)
-                    return updateUser(userId, d)
-                else:
-                    return jsonify(error='Content Type must be application/json'), 400
-            elif request.method == 'DELETE': # Delete user and all measurements for user
-                return deleteUser(userId)
-#            else:
-#                return jsonify(error='HTTP method %s not allowed' % request.method), 405
-        else:
-            return jsonify(error='Insufficient privileges'), 403
+    auth = request.authorization
+
+    if not auth:
+        user = (None, Role.USER, None)
+    elif 'error' in Token.verifyToken(auth.get('username')):
+        return jsonify(Token.verifyToken(auth.get('username'))), 401
     else:
-        return jsonify(error='Authorization required'), 401
+        user = Token.verifyToken(auth.get('username'))
+
+    # Read user
+    if request.method == 'GET':
+        return getUser(userId, user)
+    # Update user if owner or admin
+    elif request.method == 'PUT' and 'Content-Type' in headers and 'application/json' in headers.get('Content-Type') and (user[0] == userId or user[1] == Role.ADMIN):
+        d = request.get_json(silent=True)
+        return updateUser(userId, d)
+    elif request.method == 'PUT' and (user[0] == userId or user[1] == Role.ADMIN):
+        return jsonify(error='Content Type must be application/json'), 400
+    # Delete user and all measurements for user if owner or admin
+    elif request.method == 'DELETE' and user[0] == userId or user[1] == Role.ADMIN:
+        return deleteUser(userId, user)
+    # User not authenticated
+    elif not user[0]:
+        return jsonify(error='Authentication required'), 401
+    # User is not authorized for resource
+    elif user[0] != userId:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
 
 def addNewUser(d):
@@ -134,50 +134,47 @@ def addNewUser(d):
         return jsonify(errorResponse), 400
 
 
-def getAllUsers():
+def getAllUsers(user):
     """Return all users from database"""
-    users = User.query.all()
-    if users:
-        users = [i.serialize for i in users]
-        for index in users:
-            index['numberOfMeasurements'] = CommonUtils.countNumberOfRows(index['id'])
-            index['dateOfBirth'] = CommonUtils.convertToISODate(index['dateOfBirth'])
-        return jsonify(users)
+    if user[1] == Role.ADMIN:
+        q = User.query.all()
     else:
-        return ('', 204)
-
-
-def getAllPublicUsers(userId):
-    """Return all users that user has privileges to view"""
-    users = User.query.filter((User.public == True) | (User.id == userId)).all()
-    if users:
-        users = [i.serialize for i in users]
-        for index in users:
+        q = User.query.filter((User.id == user[0]) | (User.public == True)).all()
+    if q:
+        q = [i.serialize for i in q]
+        for index in q:
             index['numberOfMeasurements'] = CommonUtils.countNumberOfRows(index['id'])
             index['dateOfBirth'] = CommonUtils.convertToISODate(index['dateOfBirth'])
-        return jsonify(users)
+        return jsonify(q)
     else:
         return ('', 204)
 
 
 def deleteUsers():
-    """Delete all users with role user and their data"""
-    users = User.query.filter_by(role=Role.USER).all()
-    numberOfMeasurementsDeleted = 0
-    for index in range(len(users)):
-        numberOfMeasurementsDeleted += deleteAllMeasurements(users[index].id, True)
-        db.session.delete(users[index])
-        db.session.commit()
-    return jsonify(nubmerOfUsersDeleted=len(users), numberOfMeasurementsDeleted=numberOfMeasurementsDeleted)
+    """Delete all measurements and users with role user"""
+    measurements_deleted = Measurement.query.delete()
+    users_deleted = User.query.filter_by(role=Role.USER).delete()
+
+    db.session.commit()
+    return jsonify(nubmerOfUsersDeleted=users_deleted, numberOfMeasurementsDeleted=measurements_deleted)
 
 
-def getUser(userId):
-    """Return user from database based on userId"""
-    user = User.query.filter_by(id = userId).first()
-    user = user.serialize
-    user['numberOfMeasurements'] = CommonUtils.countNumberOfRows(userId)
-    user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
-    return jsonify(user)
+def getUser(userId, user):
+    """Query user based on userId"""
+    q = User.query.filter_by(id = userId).first()
+
+    if not q:
+        return jsonify(error='User not found', userId=userId), 404
+    elif not user[0] and not q.public:
+        return jsonify(error='Authentication required'), 401
+    elif user[0] != userId and user[1] != Role.ADMIN and not q.public:
+        return jsonify(error='Unauthorized'), 403
+#    elif user[0] == userId or user[1] == Role.ADMIN or q.public:
+    else:
+        q = q.serialize
+        q['numberOfMeasurements'] = CommonUtils.countNumberOfRows(userId)
+        q['dateOfBirth'] = CommonUtils.convertToISODate(q['dateOfBirth'])
+        return jsonify(q)
 
 
 def updateUser(userId, d):
@@ -216,10 +213,14 @@ def updateUser(userId, d):
         return jsonify(errorResponse), 400
 
 
-def deleteUser(userId):
+def deleteUser(userId, user):
     """Delete user from database based on userId"""
-    numberOfMeasurementsDeleted = deleteAllMeasurements(userId, True)
-    user = User.query.filter_by(id = userId).first()
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify(result='user removed', numberOfMeasurementsDeleted=numberOfMeasurementsDeleted, userId=userId, username=user.username)
+    q = User.query.filter_by(id = userId).first()
+
+    if q:
+        measurements_deleted = Measurement.query.filter_by(owner_id = userId).delete()
+        db.session.delete(q)
+        db.session.commit()
+        return jsonify(result='user removed', userId=userId, username=user[2], numberOfMeasurementsDeleted=measurements_deleted)
+    else:
+        return jsonify(error='User not found', userId=userId), 404

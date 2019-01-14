@@ -12,14 +12,14 @@ class Authenticate:
         """Return userId, role and username if token is valid or correct username & password pair"""
         if auth.get('username') and not auth.get('password'):
             return Token.verifyToken(auth.get('username'))
-        elif auth.get('username') and auth.get('password'):
-            if Password.verifyPassword(auth.get('username'), auth.get('password')):
-                userId, role = UserUtils.getUserIdAndRole(auth.get('username'))
-                return userId, role, auth.get('username')
-            else:
-                return {'error': 'invalid password'}
+#        elif auth.get('username') and auth.get('password'):
+#            if Password.verifyPassword(auth.get('username'), auth.get('password')):
+#                userId, role = UserUtils.getUserIdAndRole(auth.get('username'))
+#                return userId, role, auth.get('username')
+#            else:
+#                return {'error': 'invalid password'}
         else:
-            return {'error': 'authorization required'}
+            return {'error': 'login required'}
 
 
 class Password:
@@ -58,7 +58,7 @@ class Token:
             return {'error': 'Session expired, login required'}
         except BadSignature:
             return {'error': 'Invalid signature, login required'}
-        userId = data['id']
-        username = data['username']
-        role = data['role']
-        return userId, role, username
+#        userId = data['id']
+#        username = data['username']
+#        role = data['role']
+        return (data['id'], data['role'], data['username'])

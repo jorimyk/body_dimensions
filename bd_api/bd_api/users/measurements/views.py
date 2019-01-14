@@ -2,7 +2,7 @@ from flask import request, jsonify, make_response
 
 from bd_api import app, db, limiter, auth
 from . models import Measurement
-from bd_api.users.models import Role
+from bd_api.users.models import Role, User
 from bd_api import Config
 from bd_api.utils import CommonUtils, UserUtils, MeasurementUtils
 from bd_api.auth import Authenticate, Password, Token
@@ -12,34 +12,49 @@ from bd_api.auth import Authenticate, Password, Token
 # @limiter.limit("100/day")
 def measurements(userId):
     headers = request.headers
-    if not UserUtils.userExists(userId):
-        return jsonify(error='No user with id %s' % userId), 404
-    elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
-        return getMeasurements(userId)
-    elif request.authorization:
-        auth = request.authorization
-        if isinstance(Authenticate.authenticate(auth), dict):
-            return jsonify(Authenticate.authenticate(auth)), 401
-        elif Authenticate.authenticate(auth)[0] == userId or Authenticate.authenticate(auth)[1] == Role.ADMIN:
-            if request.method == 'POST': # Add new measurement data
-                if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
-                    d = request.get_json(silent=True)
-                    return addNewMeasurement(userId, d)
-                else:
-                    return jsonify(error='Content Type must be application/json'), 400
-            elif request.method == 'GET': # Get all measurement data for user
-                return getMeasurements(userId)
-            elif request.method == 'DELETE': # Delete all measurement data for user
-                return deleteAllMeasurements(userId, False)
-        else:
-            return jsonify(error='Insufficient privileges'), 403
+    auth = request.authorization
+
+    if not auth:
+        user = (None, Role.USER, None)
+    elif 'error' in Token.verifyToken(auth.get('username')):
+        return jsonify(Token.verifyToken(auth.get('username'))), 401
     else:
-        return jsonify(error='Authorization required'), 401
+        user = Token.verifyToken(auth.get('username'))
+
+    # Add new measurement data if owner
+    if request.method == 'POST' and 'Content-Type' in headers and 'application/json' in headers.get('Content-Type') and user[0] == userId:
+        d = request.get_json(silent=True)
+        return addNewMeasurement(userId, d)
+    elif request.method == 'POST' and user[0] == userId:
+        return jsonify(error='Content Type must be application/json'), 400
+    # Get all measurement data for user
+    elif request.method == 'GET':
+        return getMeasurements(userId, user)
+    # Delete all measurement data for user
+    elif request.method == 'DELETE' and user[0] == userId or user[1] == Role.ADMIN:
+        return deleteAllMeasurements(userId, user)
+    # User not authenticated
+    elif not user[0]:
+        return jsonify(error='Authentication required'), 401
+    # User is not authorized for resource
+    elif user[0] != userId:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
 
 @app.route('/users/<int:userId>/data/<int:dataId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>/data/<data>
 def measurement(userId, dataId):
     headers = request.headers
+    auth = request.authorization
+
+    if not auth:
+        user = (None, Role.USER, None)
+    elif 'error' in Token.verifyToken(auth.get('username')):
+        return jsonify(Token.verifyToken(auth.get('username'))), 401
+    else:
+        user = Token.verifyToken(auth.get('username'))
+
     if not MeasurementUtils.measurement_exists(userId, dataId):
         return jsonify(error='No data %s for user %s' % (dataId, userId)), 404
     elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
@@ -76,7 +91,7 @@ def addNewMeasurement(userId, d):
         return jsonify(error='fatTotal, bodyMass or fatVisceral needs value for weight', measurementDate=d.get('measurementDate'), weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400
     else:
         data = Measurement( \
-        user_id = userId, \
+        owner_id = userId, \
         measurementDate = CommonUtils.convertFromISODate(d.get('measurementDate')), \
         height = d.get('height'), \
         weight = d.get('weight'), \
@@ -96,34 +111,45 @@ def addNewMeasurement(userId, d):
         return response
 
 
-def getMeasurements(userId):
-    """Return all user measurements from database based on user id"""
-    data = Measurement.query.filter_by(user_id = userId).all()
-    if data:
-        data = [i.serialize for i in data]
-        for index in data:
+def getMeasurements(userId, user):
+    """Query user measurements from database based ownid"""
+    q = User.query.filter_by(id = userId).first()
+
+    if not q:
+        return jsonify(error='User not found', userId=userId), 404
+    elif not user[0] and not q.public:
+        return jsonify(error='Authentication required'), 401
+    elif user[0] != userId and not q.public:
+        return jsonify(error='Unauthorized'), 403
+    elif q.measurements:
+        measurements = [i.serialize for i in q.measurements]
+        for index in measurements:
             index['measurementDate'] = CommonUtils.convertToISODate(index['measurementDate'])
-            index['timestamp'] = CommonUtils.convertToISODate(index['timestamp'])
-        return jsonify(data)
+            index['timestamp'] = CommonUtils.convertToISODate(index['timestamp']);
+            return jsonify(measurements)
     else:
         return ('', 204)
 
 
-def deleteAllMeasurements(userId, internalCall):
-    """Delete all user measurement items in database based on user id"""
-    data = Measurement.query.filter_by(user_id = userId).all()
-    for index in range(len(data)):
-        db.session.delete(data[index])
-        db.session.commit()
-    if internalCall:
-        return len(data)
+def deleteAllMeasurements(userId, user):
+    """Delete all user measurement items in qbase based on user id"""
+    q = User.query.filter_by(id = userId).first()
+
+    if not q:
+        return jsonify(error='User not found', userId=userId), 404
+    elif not user[0]:
+        return jsonify(error='Authentication required'), 401
+    elif user[0] != userId:
+        return jsonify(error='Unauthorized'), 403
     else:
-        return jsonify(result='measurement(s) deleted', numberOfMeasurementsDeleted='%s' % len(data), userId=userId, username=CommonUtils.getUsername(userId))
+        numberOfMeasurementsDeleted = Measurement.query.filter_by(owner_id = userId).delete()
+        db.session.commit()
+        return jsonify(numberOfMeasurementsDeleted=numberOfMeasurementsDeleted, userId=userId, username=user[2])
 
 
 def getMeasurementItem(userId, dataId):
     """"Return single measurement item from database based on user id and data id"""
-    data = Measurement.query.filter_by(user_id = userId).filter_by(id = dataId).first()
+    data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
     data = data.serialize
     data['measurementDate'] = CommonUtils.convertToISODate(data['measurementDate'])
     data['timestamp'] = CommonUtils.convertToISODate(data['timestamp'])
@@ -136,7 +162,7 @@ def updateMeasurementItem(userId, dataId, d):
     if d:
         if any(key in d for key in Measurement.measurement_keys):
             if not MeasurementUtils.validate_measurement_values(userId, d):
-                data = Measurement.query.filter_by(user_id = userId).filter_by(id = dataId).first()
+                data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
                 if 'measurementDate' in d:
                     data.measurementDate = CommonUtils.convertFromISODate(d.get('measurementDate'))
                 if 'height' in d:
@@ -176,7 +202,7 @@ def updateMeasurementItem(userId, dataId, d):
 
 def deleteMeasurementItem(userId, dataId):
     """Delete measurement item from database if user id and data id matches"""
-    data = Measurement.query.filter_by(user_id = userId).filter_by(id = dataId).first()
+    data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
     db.session.delete(data)
     db.session.commit()
     return jsonify(result='measurement removed', userId=userId, username=CommonUtils.getUsername(userId), dataId=dataId)
