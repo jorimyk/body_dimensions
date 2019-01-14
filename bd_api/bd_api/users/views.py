@@ -47,20 +47,16 @@ def users():
     else:
         user = Token.verifyToken(auth.get('username'))
 
-    # Add a new user if Content-Type == application/json, else return 400
-    if request.method == 'POST' and 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
+    # Add a new user
+    if request.method == 'POST':
         d = request.get_json(silent=True)
-        return addNewUser(d)
-    elif request.method == 'POST':
-        return jsonify(error='Content Type must be application/json'), 400
+        return addNewUser(headers, d)
     # Read users that user is authorized to see
     elif request.method == 'GET':
         return getAllUsers(user)
     # Delete all users if role is admin, else return 403
-    elif request.method == 'DELETE' and user[1] == Role.ADMIN:# Delete all users
-        return deleteUsers()
-    elif request.method == 'DELETE':
-        return jsonify(error='Unauthorized'), 403
+    elif request.method == 'DELETE':# Delete all users
+        return deleteUsers(user)
     # Return 405 if method not POST, GET or DELETE
     else:
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
@@ -100,38 +96,37 @@ def user(userId):
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
 
-def addNewUser(d):
+def addNewUser(headers, d):
     """Add new user to database if valid username/password and if optional values are valid in d"""
-    errorResponse = {'firstName': 'string/null', 'lastName': 'string/null', 'gender': 'male/female/null', 'dateOfBirth': 'string YYYY-MM-DD/null', 'username': 'string (Mandatory)', 'password': 'string (Mandatory)', 'public': 'boolean/null'}
-    if d:
-        if  'username' in d and 'password' in d and 'email' in d:
-            if UserUtils.validate_user_values(d):
-                return jsonify(UserUtils.validate_user_values(d)), 400
-            user = User( \
-            firstName = d.get('firstName'), \
-            lastName = d.get('lastName'), \
-            email = d.get('email'), \
-            gender = d.get('gender'), \
-            dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth')), \
-            username = d.get('username'), \
-            password = Password.hashPassword(d.get('password')), \
-            public = d.get('public'))
-            db.session.add(user)
-            db.session.commit()
-            user = user.serialize
-            user['token'] = Token.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
-            user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
-            response = jsonify(user)
-            response.status_code = 201
-            response.headers['Content-Location'] = '/users/' + str(user['id'])
-            response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
-            return response
-        else:
-            errorResponse['error'] = 'invalid JSON keys/values'
-            return jsonify(errorResponse), 400
+
+    if not 'Content-Type' in headers or not 'application/json' in headers.get('Content-Type'):
+        return jsonify(error='Content Type must be application/json'), 400
+    elif not d:
+        return jsonify(error='no JSON in request'), 400
+    elif not 'username' in d or not 'password' in d or not 'email' in d:
+        return jsonify(error='username, password and email required'), 400
+    elif UserUtils.validate_user_values(d):
+        return jsonify(UserUtils.validate_user_values(d)), 400
     else:
-        errorResponse['error'] = 'no JSON in request'
-        return jsonify(errorResponse), 400
+        user = User( \
+        firstName = d.get('firstName'), \
+        lastName = d.get('lastName'), \
+        email = d.get('email'), \
+        gender = d.get('gender'), \
+        dateOfBirth = CommonUtils.convertFromISODate(d.get('dateOfBirth')), \
+        username = d.get('username'), \
+        password = Password.hashPassword(d.get('password')), \
+        public = d.get('public'))
+        db.session.add(user)
+        db.session.commit()
+        user = user.serialize
+        user['token'] = Token.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
+        user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
+        response = jsonify(user)
+        response.status_code = 201
+        response.headers['Content-Location'] = '/users/' + str(user['id'])
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
+        return response
 
 
 def getAllUsers(user):
@@ -150,13 +145,16 @@ def getAllUsers(user):
         return ('', 204)
 
 
-def deleteUsers():
+def deleteUsers(user):
     """Delete all measurements and users with role user"""
-    measurements_deleted = Measurement.query.delete()
-    users_deleted = User.query.filter_by(role=Role.USER).delete()
 
-    db.session.commit()
-    return jsonify(nubmerOfUsersDeleted=users_deleted, numberOfMeasurementsDeleted=measurements_deleted)
+    if user[1] == Role.ADMIN:
+        measurements_deleted = Measurement.query.delete()
+        users_deleted = User.query.filter_by(role=Role.USER).delete()
+        db.session.commit()
+        return jsonify(usersDeleted=users_deleted, measurementsDeleted=measurements_deleted)
+    else:
+        return jsonify(error='Unauthorized'), 403
 
 
 def getUser(userId, user):
