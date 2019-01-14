@@ -5,7 +5,7 @@ from . models import Measurement
 from bd_api.users.models import Role, User
 from bd_api import Config
 from bd_api.utils import CommonUtils, UserUtils, MeasurementUtils
-from bd_api.auth import Authenticate, Password, Token
+from bd_api.auth import Authenticate, Token
 
 
 @app.route('/users/<int:userId>/data', methods = ['POST', 'GET', 'DELETE']) # /users/<user>/data
