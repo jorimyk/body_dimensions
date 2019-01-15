@@ -22,11 +22,9 @@ def measurements(userId):
         user = Token.verifyToken(auth.get('username'))
 
     # Add new measurement data if owner
-    if request.method == 'POST' and 'Content-Type' in headers and 'application/json' in headers.get('Content-Type') and user[0] == userId:
+    if request.method == 'POST':
         d = request.get_json(silent=True)
-        return addNewMeasurement(userId, d)
-    elif request.method == 'POST' and user[0] == userId:
-        return jsonify(error='Content Type must be application/json'), 400
+        return addNewMeasurement(headers, userId, user, d)
     # Get all measurement data for user
     elif request.method == 'GET':
         return getMeasurements(userId, user)
@@ -34,11 +32,11 @@ def measurements(userId):
     elif request.method == 'DELETE' and user[0] == userId or user[1] == Role.ADMIN:
         return deleteAllMeasurements(userId, user)
     # User not authenticated
-    elif not user[0]:
-        return jsonify(error='Authentication required'), 401
+#    elif not user[0]:
+#        return jsonify(error='Authentication required'), 401
     # User is not authorized for resource
-    elif user[0] != userId:
-        return jsonify(error='Unauthorized'), 403
+#    elif user[0] != userId:
+#        return jsonify(error='Unauthorized'), 403
     else:
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
@@ -80,17 +78,23 @@ def measurement(userId, dataId):
         return jsonify(error='Authorization required'), 401
 
 
-def addNewMeasurement(userId, d):
+def addNewMeasurement(headers, userId, user, d):
     """Add new measurement item to database if valid JSON with valid keys/values in d"""
-    if d and 'measurementDate' in d:
-        if MeasurementUtils.validate_measurement_values(userId, d):
-            return jsonify(MeasurementUtils.validate_measurement_values(userId, d)), 400
+
+    if user[0] != userId:
+        return jsonify(error='Unauthorized'), 403
+    elif not 'Content-Type' in headers or not 'application/json' in headers.get('Content-Type'):
+        return jsonify(error='Content Type must be application/json'), 400
+    elif not d:
+        return jsonify(error='no JSON in request'), 400
+    elif not 'measurementDate' in d or not any(key in d for key in Measurement.measurement_keys):
+        return jsonify(error='Measurement must have measurement date and at least one measurement value'), 400
+    elif MeasurementUtils.validate_measurement_values(userId, d):
+        return jsonify(MeasurementUtils.validate_measurement_values(userId, d)), 400
+    elif (d.get('fatTotal') or d.get('bodyMass') or d.get('fatVisceral')) and not d.get('weight'):
+        return jsonify(error='fatTotal, bodyMass or fatVisceral needs value for weight'), 400
     else:
-        return jsonify(error='no valid JSON in request', measurementDate='Mandatory, string YYYY-MM-DD', height='number/null', weight='number/null', waistline='number/null', fatTotal='number/null', bodyMass='number/null', fatVisceral='number/null'), 400
-    if (d.get('fatTotal') or d.get('bodyMass') or d.get('fatVisceral')) and not d.get('weight'):
-        return jsonify(error='fatTotal, bodyMass or fatVisceral needs value for weight', measurementDate=d.get('measurementDate'), weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400
-    else:
-        data = Measurement( \
+        q = Measurement( \
         owner_id = userId, \
         measurementDate = CommonUtils.convertFromISODate(d.get('measurementDate')), \
         height = d.get('height'), \
@@ -99,11 +103,9 @@ def addNewMeasurement(userId, d):
         fatTotal = d.get('fatTotal'), \
         bodyMass = d.get('bodyMass'), \
         fatVisceral = d.get('fatVisceral'))
-        db.session.add(data)
+        db.session.add(q)
         db.session.commit()
-        data = data.serialize
-        data['measurementDate'] = CommonUtils.convertToISODate(data['measurementDate'])
-        data['timestamp'] = CommonUtils.convertToISODate(data['timestamp'])
+        data = q.serialize
         response = jsonify(data)
         response.status_code = 201
         response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data['id'])
