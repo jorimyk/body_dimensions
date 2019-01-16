@@ -29,14 +29,8 @@ def measurements(userId):
     elif request.method == 'GET':
         return getMeasurements(userId, user)
     # Delete all measurement data for user
-    elif request.method == 'DELETE' and user[0] == userId or user[1] == Role.ADMIN:
+    elif request.method == 'DELETE':
         return deleteAllMeasurements(userId, user)
-    # User not authenticated
-#    elif not user[0]:
-#        return jsonify(error='Authentication required'), 401
-    # User is not authorized for resource
-#    elif user[0] != userId:
-#        return jsonify(error='Unauthorized'), 403
     else:
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
@@ -141,12 +135,12 @@ def deleteAllMeasurements(userId, user):
         return jsonify(error='User not found', userId=userId), 404
     elif not user[0]:
         return jsonify(error='Authentication required'), 401
-    elif user[0] != userId:
+    elif user[0] != userId and user[1] != Role.ADMIN:
         return jsonify(error='Unauthorized'), 403
     else:
-        numberOfMeasurementsDeleted = Measurement.query.filter_by(owner_id = userId).delete()
+        measurements_deleted = Measurement.query.filter_by(owner_id = userId).delete()
         db.session.commit()
-        return jsonify(numberOfMeasurementsDeleted=numberOfMeasurementsDeleted, userId=userId, username=user[2])
+        return jsonify(measurementsDeleted=measurements_deleted, userId=userId, username=user[2])
 
 
 def getMeasurementItem(userId, dataId):
