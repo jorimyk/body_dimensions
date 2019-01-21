@@ -119,10 +119,7 @@ def getMeasurements(userId, user):
         return jsonify(error='Unauthorized'), 403
     elif q.measurements:
         measurements = [i.serialize for i in q.measurements]
-        for index in measurements:
-            index['measurementDate'] = CommonUtils.convertToISODate(index['measurementDate'])
-            index['timestamp'] = CommonUtils.convertToISODate(index['timestamp']);
-            return jsonify(measurements)
+        return jsonify(measurements)
     else:
         return ('', 204)
 
@@ -147,8 +144,6 @@ def getMeasurementItem(userId, dataId):
     """"Return single measurement item from database based on user id and data id"""
     data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
     data = data.serialize
-    data['measurementDate'] = CommonUtils.convertToISODate(data['measurementDate'])
-    data['timestamp'] = CommonUtils.convertToISODate(data['timestamp'])
     return jsonify(data)
 
 
@@ -179,8 +174,6 @@ def updateMeasurementItem(userId, dataId, d):
                     db.session.add(data)
                     db.session.commit()
                     data = data.serialize
-                    data['measurementDate'] = CommonUtils.convertToISODate(data['measurementDate'])
-                    data['timestamp'] = CommonUtils.convertToISODate(data['timestamp'])
                     response = jsonify(data)
                     response.status_code = 200
                     response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data['id'])

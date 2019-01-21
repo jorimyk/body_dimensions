@@ -20,8 +20,8 @@ class Measurement(db.Model):
         return {
             'id': self.id,
             'owner_id': self.owner_id,
-            'timestamp': self.timestamp,
-            'measurementDate': self.measurementDate,
+            'timestamp': self.timestamp.isoformat(),
+            'measurementDate': self.measurementDate.isoformat(),
             'height' : self.height,
             'weight' : self.weight,
             'fatTotal' : self.fatTotal,
@@ -30,8 +30,7 @@ class Measurement(db.Model):
             'waistline' : self.waistline
         }
 
-    measurement_keys = ['measurementDate',
-                        'height',
+    measurement_keys = ['height',
                         'weight',
                         'fatTotal',
                         'bodyMass',

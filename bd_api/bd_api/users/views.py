@@ -114,7 +114,6 @@ def addNewUser(headers, d):
         db.session.commit()
         user = q.serialize
         user['token'] = Token.generateToken(user['id'], d.get('username'), 'user', Config.expiration).decode('ascii')
-        user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
         response = jsonify(user)
         response.status_code = 201
         response.headers['Content-Location'] = '/users/' + str(user['id'])
@@ -132,7 +131,6 @@ def getAllUsers(user):
         q = [i.serialize for i in q]
         for index in q:
             index['measurements'] = CommonUtils.countNumberOfRows(index['id'])
-            index['dateOfBirth'] = CommonUtils.convertToISODate(index['dateOfBirth'])
         return jsonify(q)
     else:
         return ('', 204)
@@ -163,7 +161,6 @@ def getUser(userId, user):
     else:
         q = q.serialize
         q['measurements'] = CommonUtils.countNumberOfRows(userId)
-        q['dateOfBirth'] = CommonUtils.convertToISODate(q['dateOfBirth'])
         return jsonify(q)
 
 
@@ -202,7 +199,6 @@ def updateUser(headers, userId, user, d):
     db.session.add(q)
     db.session.commit()
     user = q.serialize
-    user['dateOfBirth'] = CommonUtils.convertToISODate(user['dateOfBirth'])
     return jsonify(user), 200
 
 

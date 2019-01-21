@@ -23,6 +23,8 @@ class User(db.Model):
 
     @property
     def serialize(self):
+        if self.dateOfBirth:
+            self.dateOfBirth = self.dateOfBirth.isoformat()
         return {
             'id': self.id,
             'email': self.email,
@@ -33,7 +35,7 @@ class User(db.Model):
             'lastName' : self.lastName,
             'gender' : self.gender,
             'dateOfBirth' : self.dateOfBirth,
-            'dateJoined' : self.dateJoined
+            'dateJoined' : self.dateJoined.isoformat()
         }
 
 
