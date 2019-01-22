@@ -47,29 +47,33 @@ def measurement(userId, dataId):
     else:
         user = Token.verifyToken(auth.get('username'))
 
-    if not MeasurementUtils.measurement_exists(userId, dataId):
-        return jsonify(error='No data %s for user %s' % (dataId, userId)), 404
-    elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
-        return getMeasurementItem(userId, dataId)
-    elif request.authorization:
-        auth = request.authorization
-        if isinstance(Authenticate.authenticate(auth), dict):
-            return jsonify(Authenticate.authenticate(auth)), 401
-        elif Authenticate.authenticate(auth)[0] == userId or Authenticate.authenticate(auth)[1] == Role.ADMIN:
-            if request.method == 'GET': # Get a measurement data item
-                return getMeasurementItem(userId, dataId)
-            elif request.method == 'PUT': # Update a measurement data item
-                if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
-                    d = request.get_json(silent=True)
-                    return updateMeasurementItem(userId, dataId, d)
-                else:
-                    return jsonify(error='Content Type must be application/json'), 400
-            elif request.method == 'DELETE': # Delete a measurement data item
-                return deleteMeasurementItem(userId, dataId)
-        else:
-            return jsonify(error='Insufficient privileges'), 403
+#    if not MeasurementUtils.measurement_exists(userId, dataId):
+#        return jsonify(error='No data %s for user %s' % (dataId, userId)), 404
+#    elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
+#        return getMeasurementItem(userId, dataId)
+    if request.method == 'GET':
+        return getMeasurementItem(userId, dataId, user)
+#    elif request.authorization:
+#        auth = request.authorization
+#        if isinstance(Authenticate.authenticate(auth), dict):
+#            return jsonify(Authenticate.authenticate(auth)), 401
+#        elif Authenticate.authenticate(auth)[0] == userId or Authenticate.authenticate(auth)[1] == Role.ADMIN:
+#            if request.method == 'GET': # Get a measurement data item
+#                return getMeasurementItem(userId, dataId)
+#    elif request.method == 'PUT': # Update a measurement data item
+#                if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
+#                    d = request.get_json(silent=True)
+#                    return updateMeasurementItem(userId, dataId, d)
+#                else:
+#                    return jsonify(error='Content Type must be application/json'), 400
+#    elif request.method == 'DELETE': # Delete a measurement data item
+#        return deleteMeasurementItem(userId, dataId)
+#    else:
+#            return jsonify(error='Insufficient privileges'), 403
+#    else:
+#        return jsonify(error='Authorization required'), 401
     else:
-        return jsonify(error='Authorization required'), 401
+        return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
 
 def addNewMeasurement(headers, userId, user, d):
@@ -140,11 +144,19 @@ def deleteAllMeasurements(userId, user):
         return jsonify(measurementsDeleted=measurements_deleted, userId=userId, username=user[2])
 
 
-def getMeasurementItem(userId, dataId):
+def getMeasurementItem(userId, dataId, user):
     """"Return single measurement item from database based on user id and data id"""
-    data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
-    data = data.serialize
-    return jsonify(data)
+    q = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
+
+    if not q:
+        return jsonify(error='Measurement not found', userId=userId, dataId=dataId), 404
+    elif not user[0] and not q.owner.public:
+        return jsonify(error='Authentication required'), 401
+    elif user[0] != userId and not q.owner.public:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        data = q.serialize
+        return jsonify(data)
 
 
 def updateMeasurementItem(userId, dataId, d):
