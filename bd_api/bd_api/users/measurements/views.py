@@ -185,9 +185,17 @@ def updateMeasurementItem(headers, userId, dataId, user, d):
     return response
 
 
-def deleteMeasurementItem(userId, dataId):
-    """Delete measurement item from database if user id and data id matches"""
-    data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
-    db.session.delete(data)
-    db.session.commit()
-    return jsonify(result='measurement removed', userId=userId, username=CommonUtils.getUsername(userId), dataId=dataId)
+def deleteMeasurementItem(userId, dataId, user):
+    """Delete measurement item from database if authorized and if user id and data id matches"""
+
+    if user[0] != userId and user[1] != Role.ADMIN:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        q = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
+
+    if not q:
+        return jsonify(error='Measurement not found', userId=userId, dataId=dataId), 404
+    else:
+        db.session.delete(q)
+        db.session.commit()
+        return jsonify(result='measurement removed', userId=userId, username=user[2], dataId=dataId)
