@@ -47,31 +47,13 @@ def measurement(userId, dataId):
     else:
         user = Token.verifyToken(auth.get('username'))
 
-#    if not MeasurementUtils.measurement_exists(userId, dataId):
-#        return jsonify(error='No data %s for user %s' % (dataId, userId)), 404
-#    elif request.method == 'GET' and UserUtils.checkIfPublicUser(userId):
-#        return getMeasurementItem(userId, dataId)
     if request.method == 'GET':
         return getMeasurementItem(userId, dataId, user)
-#    elif request.authorization:
-#        auth = request.authorization
-#        if isinstance(Authenticate.authenticate(auth), dict):
-#            return jsonify(Authenticate.authenticate(auth)), 401
-#        elif Authenticate.authenticate(auth)[0] == userId or Authenticate.authenticate(auth)[1] == Role.ADMIN:
-#            if request.method == 'GET': # Get a measurement data item
-#                return getMeasurementItem(userId, dataId)
-#    elif request.method == 'PUT': # Update a measurement data item
-#                if 'Content-Type' in headers and 'application/json' in headers.get('Content-Type'):
-#                    d = request.get_json(silent=True)
-#                    return updateMeasurementItem(userId, dataId, d)
-#                else:
-#                    return jsonify(error='Content Type must be application/json'), 400
-#    elif request.method == 'DELETE': # Delete a measurement data item
-#        return deleteMeasurementItem(userId, dataId)
-#    else:
-#            return jsonify(error='Insufficient privileges'), 403
-#    else:
-#        return jsonify(error='Authorization required'), 401
+    elif request.method == 'PUT': # Update a measurement data item
+        d = request.get_json(silent=True)
+        return updateMeasurementItem(headers, userId, dataId, user, d)
+    elif request.method == 'DELETE': # Delete a measurement data item
+        return deleteMeasurementItem(userId, dataId, user)
     else:
         return jsonify(error='HTTP method %s not allowed' % request.method), 405
 
@@ -159,46 +141,48 @@ def getMeasurementItem(userId, dataId, user):
         return jsonify(data)
 
 
-def updateMeasurementItem(userId, dataId, d):
+def updateMeasurementItem(headers, userId, dataId, user, d):
     """Update user changes to database if valid values in d"""
-    errorResponse = {'measurementDate': 'string YYYY-MM-DD (if key exists)', 'height': 'number/null (if key exists)', 'weight': 'number/null (if key exists)', 'waistline': 'number/null (if key exists)', 'fatTotal': 'number/null (if key exists)', 'bodyMass': 'number/null (if key exists)', 'fatVisceral': 'number/null (if key exists)'}
-    if d:
-        if any(key in d for key in Measurement.measurement_keys):
-            if not MeasurementUtils.validate_measurement_values(userId, d):
-                data = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
-                if 'measurementDate' in d:
-                    data.measurementDate = CommonUtils.convertFromISODate(d.get('measurementDate'))
-                if 'height' in d:
-                    data.height = d.get('height')
-                if 'weight' in d:
-                    data.weight = d.get('weight')
-                if 'waistline' in d:
-                    data.waistline = d.get('waistline')
-                if 'fatTotal' in d:
-                    data.fatTotal = d.get('fatTotal')
-                if 'fatVisceral' in d:
-                    data.fatVisceral = d.get('fatVisceral')
-                if 'bodyMass' in d:
-                    data.bodyMass = d.get('bodyMass')
-                if (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) and not data.weight and not d.get('weight'):
-                    return jsonify(error='fatTotal, bodyMass and fatVisceral need value for weight', weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400
-                else:
-                    db.session.add(data)
-                    db.session.commit()
-                    data = data.serialize
-                    response = jsonify(data)
-                    response.status_code = 200
-                    response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data['id'])
-                    response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
-                    return response
-            else:
-                return jsonify(MeasurementUtils.validate_measurement_values(userId, d)), 400
-        else:
-            errorResponse['error'] = 'no valid keys or nothing to be updated'
-            return jsonify(errorResponse), 400
-    else:
-        errorResponse['error'] = 'no valid JSON in request'
-        return jsonify(errorResponse), 400
+    q = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
+
+    if not q:
+        return jsonify(error='Measurement not found', userId=userId, dataId=dataId), 404
+    if user[0] != userId:
+        return jsonify(error='Unauthorized'), 403
+    if not 'Content-Type' in headers or not 'application/json' in headers.get('Content-Type'):
+        return jsonify(error='Content Type must be application/json'), 400
+    if not d:
+        return jsonify(error='no JSON in request'), 400
+    if not 'measurementDate' in d and not any(key in d for key in Measurement.measurement_keys):
+        return jsonify(error='No valid keys found'), 400
+    if MeasurementUtils.validate_measurement_values(userId, d):
+        return jsonify(MeasurementUtils.validate_measurement_values(userId, d)), 400
+    if (d.get('fatTotal') or d.get('fatVisceral') or d.get('bodyMass')) and not q.weight and not d.get('weight'):
+        return jsonify(error='fatTotal, bodyMass and fatVisceral need value for weight', weight='Mandatory', fatTotal=d.get('fatTotal'), bodyMass=d.get('bodyMass'), fatVisceral=d.get('fatVisceral')), 400
+
+    if 'measurementDate' in d:
+        q.measurementDate = CommonUtils.convertFromISODate(d.get('measurementDate'))
+    if 'height' in d:
+        q.height = d.get('height')
+    if 'weight' in d:
+        q.weight = d.get('weight')
+    if 'waistline' in d:
+        q.waistline = d.get('waistline')
+    if 'fatTotal' in d:
+        q.fatTotal = d.get('fatTotal')
+    if 'fatVisceral' in d:
+        q.fatVisceral = d.get('fatVisceral')
+    if 'bodyMass' in d:
+        q.bodyMass = d.get('bodyMass')
+
+    db.session.add(q)
+    db.session.commit()
+    data = q.serialize
+    response = jsonify(data)
+    response.status_code = 200
+    response.headers['Content-Location'] = '/users/' + str(userId) + '/data/' + str(data['id'])
+    response.headers['Access-Control-Expose-Headers'] = 'Content-Location'
+    return response
 
 
 def deleteMeasurementItem(userId, dataId):
