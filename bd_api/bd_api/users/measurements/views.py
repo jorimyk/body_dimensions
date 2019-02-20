@@ -11,6 +11,7 @@ from bd_api.auth import Authenticate, Token
 @app.route('/users/<int:userId>/data', methods = ['POST', 'GET', 'DELETE']) # /users/<user>/data
 # @limiter.limit("100/day")
 def measurements(userId):
+    
     headers = request.headers
     auth = request.authorization
 
@@ -37,6 +38,7 @@ def measurements(userId):
 
 @app.route('/users/<int:userId>/data/<int:dataId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>/data/<data>
 def measurement(userId, dataId):
+
     headers = request.headers
     auth = request.authorization
 
@@ -95,6 +97,7 @@ def addNewMeasurement(headers, userId, user, d):
 
 def getMeasurements(userId, user):
     """Query user measurements from database based ownid"""
+
     q = User.query.filter_by(id = userId).first()
 
     if not q:
@@ -111,15 +114,15 @@ def getMeasurements(userId, user):
 
 
 def deleteAllMeasurements(userId, user):
-    """Delete all user measurement items in qbase based on user id"""
-    q = User.query.filter_by(id = userId).first()
+    """Delete all user measurement items in database based on user id"""
+
+    if user[0] != userId and user[1] != Role.ADMIN:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        q = User.query.filter_by(id = userId).first()
 
     if not q:
         return jsonify(error='User not found', userId=userId), 404
-    elif not user[0]:
-        return jsonify(error='Authentication required'), 401
-    elif user[0] != userId and user[1] != Role.ADMIN:
-        return jsonify(error='Unauthorized'), 403
     else:
         measurements_deleted = Measurement.query.filter_by(owner_id = userId).delete()
         db.session.commit()
@@ -128,6 +131,7 @@ def deleteAllMeasurements(userId, user):
 
 def getMeasurementItem(userId, dataId, user):
     """"Return single measurement item from database based on user id and data id"""
+
     q = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
 
     if not q:
@@ -143,12 +147,14 @@ def getMeasurementItem(userId, dataId, user):
 
 def updateMeasurementItem(headers, userId, dataId, user, d):
     """Update user changes to database if valid values in d"""
-    q = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
+
+    if user[0] != userId:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        q = Measurement.query.filter_by(owner_id = userId).filter_by(id = dataId).first()
 
     if not q:
         return jsonify(error='Measurement not found', userId=userId, dataId=dataId), 404
-    if user[0] != userId:
-        return jsonify(error='Unauthorized'), 403
     if not 'Content-Type' in headers or not 'application/json' in headers.get('Content-Type'):
         return jsonify(error='Content Type must be application/json'), 400
     if not d:

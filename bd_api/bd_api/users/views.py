@@ -17,6 +17,7 @@ if not User.query.all():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+
     if request.authorization:
         auth = request.authorization
     elif request.form['username'] and request.form['password']:
@@ -37,6 +38,7 @@ def login():
 
 @app.route('/users', methods = ['POST', 'GET', 'PUT', 'DELETE']) # /users
 def users():
+
     headers = request.headers
     auth = request.authorization
 
@@ -64,6 +66,7 @@ def users():
 
 @app.route('/users/<int:userId>', methods = ['GET', 'PUT', 'DELETE']) # /users/<user>
 def user(userId):
+
     headers = request.headers
     auth = request.authorization
 
@@ -123,10 +126,12 @@ def addNewUser(headers, d):
 
 def getAllUsers(user):
     """Return all users from database"""
+
     if user[1] == Role.ADMIN:
         q = User.query.all()
     else:
         q = User.query.filter((User.id == user[0]) | (User.public == True)).all()
+
     if q:
         q = [i.serialize for i in q]
         for index in q:
@@ -150,6 +155,7 @@ def deleteUsers(user):
 
 def getUser(userId, user):
     """Query user based on userId"""
+
     q = User.query.filter_by(id = userId).first()
 
     if not q:
@@ -166,12 +172,14 @@ def getUser(userId, user):
 
 def updateUser(headers, userId, user, d):
     """Update user details if valid keys/values in d"""
-    q = User.query.filter_by(id = userId).first()
+
+    if user[0] != userId and user[1] != Role.ADMIN:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        q = User.query.filter_by(id = userId).first()
 
     if not q:
         return jsonify(error='User not found', userId=userId), 404
-    if user[0] != userId and user[1] != Role.ADMIN:
-        return jsonify(error='Unauthorized'), 403
     if not 'Content-Type' in headers or not 'application/json' in headers.get('Content-Type'):
         return jsonify(error='Content Type must be application/json'), 400
     if not d:
@@ -204,12 +212,14 @@ def updateUser(headers, userId, user, d):
 
 def deleteUser(userId, user):
     """Delete user from database based on userId"""
-    q = User.query.filter_by(id = userId).first()
+
+    if user[0] != userId and user[1] != Role.ADMIN:
+        return jsonify(error='Unauthorized'), 403
+    else:
+        q = User.query.filter_by(id = userId).first()
 
     if not q:
         return jsonify(error='User not found', userId=userId), 404
-    elif user[0] != userId and user[1] != Role.ADMIN:
-        return jsonify(error='Unauthorized'), 403
     else:
         measurements_deleted = Measurement.query.filter_by(owner_id = userId).delete()
         db.session.delete(q)
